@@ -50,6 +50,7 @@ func LatticeTopics(h core.HostData) Topics {
 type ProviderAction struct {
 	Operation string
 	Msg       []byte
+	FromActor string
 	// Respond   chan ProviderResponse
 }
 

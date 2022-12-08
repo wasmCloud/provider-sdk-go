@@ -45,7 +45,7 @@ func WithShutdownFunc(inFunc func() error) ProviderOption {
 				return err
 			}
 
-			wp.Cancel()
+			wp.cancel()
 			return nil
 		}
 		return nil

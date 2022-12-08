@@ -22,7 +22,7 @@ import (
 
 type WasmcloudProvider struct {
 	context context.Context
-	Cancel  context.CancelFunc
+	cancel  context.CancelFunc
 	Logger  logr.Logger
 
 	hostData   core.HostData
@@ -72,7 +72,7 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 	ctx, cancel := context.WithCancel(context.Background())
 	provider := &WasmcloudProvider{
 		context: ctx,
-		Cancel:  cancel,
+		cancel:  cancel,
 		Logger: logrusr.New(logrusLog).
 			WithName(hostData.HostId),
 
@@ -117,22 +117,24 @@ func (wp WasmcloudProvider) Start() error {
 		return err
 	}
 
-	select {
-	case actorData := <-wp.newLink:
-		err := wp.newLinkFunc(actorData)
-		if err != nil {
-			// TODO: handle this better?
-			log.Print("ERROR: " + err.Error())
+startloop:
+	for {
+		select {
+		case actorData := <-wp.newLink:
+			err := wp.newLinkFunc(actorData)
+			if err != nil {
+				// TODO: handle this better?
+				log.Print("ERROR: " + err.Error())
+			}
+		case <-wp.shutdown:
+			err := wp.shutdownFunc()
+			if err != nil {
+				// TODO: handle this better?
+				log.Print("ERROR: " + err.Error())
+			}
+		case <-wp.context.Done():
+			break startloop
 		}
-		wp.listenForActor(actorData.ActorID)
-	case <-wp.shutdown:
-		err := wp.shutdownFunc()
-		if err != nil {
-			// TODO: handle this better?
-			log.Print("ERROR: " + err.Error())
-		}
-	case <-wp.context.Done():
-		break
 	}
 
 	return nil
@@ -156,6 +158,7 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 			payload := ProviderAction{
 				Operation: i.Operation,
 				Msg:       i.Msg,
+				FromActor: actorID,
 			}
 
 			// TODO: need to set default
@@ -165,17 +168,12 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 				return
 			}
 
-			// Sanity check
-			dd := msgpack.NewDecoder(resp.Msg)
-			a, err := dd.ReadInt32()
-			p.Logger.Info(fmt.Sprintf("Decoded msgpack: %v", a))
-			p.Logger.Error(err, "Decoding error")
-
-			// ir := new(core.InvocationResponse)
-			ir := core.InvocationResponse{}
-			ir.Msg = resp.Msg
-			ir.InvocationId = i.Id
-			ir.ContentLength = uint64(len(resp.Msg))
+			ir := core.InvocationResponse{
+				Msg:           resp.Msg,
+				Error:         resp.Error,
+				InvocationId:  i.Id,
+				ContentLength: uint64(len(resp.Msg)),
+			}
 
 			var sizer msgpack.Sizer
 			size_enc := &sizer
@@ -185,7 +183,6 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 			enc := &encoder
 			ir.MEncode(enc)
 
-			p.Logger.Info(fmt.Sprintf("Sending response: %v", string(buf)))
 			p.natsConnection.Publish(m.Reply, buf)
 		})
 }
@@ -226,7 +223,6 @@ func (p *WasmcloudProvider) subToNats() error {
 			enc := &encoder
 			hc.MEncode(enc)
 
-			p.Logger.Info("Sending good health")
 			p.natsConnection.Publish(m.Reply, buf)
 		})
 	if err != nil {
@@ -234,7 +230,6 @@ func (p *WasmcloudProvider) subToNats() error {
 		return err
 	}
 
-	p.Logger.Info("Sub to health")
 	p.natsSubscriptions = append(p.natsSubscriptions, health)
 
 	linkDel, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_DEL,

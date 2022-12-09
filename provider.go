@@ -21,6 +21,8 @@ import (
 )
 
 type WasmcloudProvider struct {
+	Id string
+
 	context context.Context
 	cancel  context.CancelFunc
 	Logger  logr.Logger
@@ -30,7 +32,7 @@ type WasmcloudProvider struct {
 	Topics     Topics
 
 	natsConnection    *nats.Conn
-	natsSubscriptions []*nats.Subscription
+	natsSubscriptions map[string]*nats.Subscription
 
 	healthMsgFunc func() string
 
@@ -38,8 +40,9 @@ type WasmcloudProvider struct {
 	shutdown     chan struct{}
 
 	newLinkFunc func(ActorConfig) error
+	delLinkFunc func(ActorConfig) error
 	newLink     chan ActorConfig
-	links       []ActorConfig
+	links       []core.LinkDefinition
 
 	providerActionFunc func(ProviderAction) (*ProviderResponse, error)
 }
@@ -64,13 +67,15 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 	if err != nil {
 		return nil, err
 	}
-
 	nc, err := nats.Connect(hostData.LatticeRpcUrl)
 	if err != nil {
 		return nil, err
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	provider := &WasmcloudProvider{
+		Id: hostData.ProviderKey,
+
 		context: ctx,
 		cancel:  cancel,
 		Logger: logrusr.New(logrusLog).
@@ -81,7 +86,7 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 		Topics:     LatticeTopics(hostData),
 
 		natsConnection:    nc,
-		natsSubscriptions: []*nats.Subscription{},
+		natsSubscriptions: map[string]*nats.Subscription{},
 
 		healthMsgFunc: func() string { return "healthy" },
 
@@ -89,8 +94,9 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 		shutdown:     make(chan struct{}),
 
 		newLinkFunc: func(ActorConfig) error { return nil },
+		delLinkFunc: func(ActorConfig) error { return nil },
 		newLink:     make(chan ActorConfig),
-		links:       []ActorConfig{},
+		links:       hostData.LinkDefinitions,
 
 		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
 			return &ProviderResponse{}, nil
@@ -101,6 +107,14 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 		err := opt(provider)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	// TODO: start listening on existing links
+	for _, link := range provider.links {
+		provider.Logger.Info(fmt.Sprintf("Evaluating link: %v", link.ProviderId))
+		if link.ProviderId == provider.Id {
+			provider.newLinkFunc(ActorConfig{link.ActorId, link.Values})
 		}
 	}
 
@@ -117,26 +131,7 @@ func (wp WasmcloudProvider) Start() error {
 		return err
 	}
 
-startloop:
-	for {
-		select {
-		case actorData := <-wp.newLink:
-			err := wp.newLinkFunc(actorData)
-			if err != nil {
-				// TODO: handle this better?
-				log.Print("ERROR: " + err.Error())
-			}
-		case <-wp.shutdown:
-			err := wp.shutdownFunc()
-			if err != nil {
-				// TODO: handle this better?
-				log.Print("ERROR: " + err.Error())
-			}
-		case <-wp.context.Done():
-			break startloop
-		}
-	}
-
+	<-wp.context.Done()
 	return nil
 }
 
@@ -147,7 +142,7 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 		p.hostData.LinkName,
 	)
 
-	p.natsConnection.Subscribe(subj,
+	actorsub, err := p.natsConnection.Subscribe(subj,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
 			i, err := core.MDecodeInvocation(&d)
@@ -185,29 +180,16 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 
 			p.natsConnection.Publish(m.Reply, buf)
 		})
+
+	if err != nil {
+		p.Logger.Error(err, "ACTOR_SUB")
+		return
+	}
+
+	p.natsSubscriptions[actorID] = actorsub
 }
 
 func (p *WasmcloudProvider) subToNats() error {
-	linkGet, err := p.natsConnection.QueueSubscribe(
-		p.Topics.LATTICE_LINKDEF_GET,
-		p.Topics.LATTICE_LINKDEF_GET,
-		func(m *nats.Msg) {
-			var sizer msgpack.Sizer
-			size_enc := &sizer
-			p.hostData.LinkDefinitions.MEncode(size_enc)
-			buf := make([]byte, sizer.Len())
-			encoder := msgpack.NewEncoder(buf)
-			enc := &encoder
-			p.hostData.LinkDefinitions.MEncode(enc)
-			p.natsConnection.Publish(m.Reply, buf)
-		})
-	if err != nil {
-		p.Logger.Error(err, "LINKDEF_GET: "+p.Topics.LATTICE_LINKDEF_GET)
-		return err
-	}
-
-	p.natsSubscriptions = append(p.natsSubscriptions, linkGet)
-
 	health, err := p.natsConnection.Subscribe(p.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
 			hc := core.HealthCheckResponse{
@@ -229,24 +211,32 @@ func (p *WasmcloudProvider) subToNats() error {
 		p.Logger.Error(err, "LATTICE_HEALTH")
 		return err
 	}
-
-	p.natsSubscriptions = append(p.natsSubscriptions, health)
+	p.natsSubscriptions[p.Topics.LATTICE_HEALTH] = health
 
 	linkDel, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_DEL,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
 
-			// TODO: Handle a deleted link correctly
-			_, err := core.MDecodeLinkDefinition(&d)
+			linkdef, err := core.MDecodeLinkDefinition(&d)
 			if err != nil {
 				return
 			}
+
+			err = p.delLinkFunc(ActorConfig{linkdef.ActorId, linkdef.Values})
+			if err != nil {
+				p.Logger.Error(err, "failed to delete link")
+				return
+			}
+
+			// shutdown specific NATs subscription
+			p.natsSubscriptions[linkdef.ActorId].Drain()
+			p.natsSubscriptions[linkdef.ActorId].Unsubscribe()
 		})
 	if err != nil {
 		p.Logger.Error(err, "LINKDEF_DEL")
 		return err
 	}
-	p.natsSubscriptions = append(p.natsSubscriptions, linkDel)
+	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_DEL] = linkDel
 
 	linkPut, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_PUT,
 		func(m *nats.Msg) {
@@ -256,27 +246,38 @@ func (p *WasmcloudProvider) subToNats() error {
 				return
 			}
 
-			p.newLink <- ActorConfig{linkdef.ActorId, linkdef.Values}
+			// TODO: newLinkFunc needs to take a core.LinkDefination
+			err = p.newLinkFunc(ActorConfig{linkdef.ActorId, linkdef.Values})
+			if err != nil {
+				// TODO: handle this better?
+				p.Logger.Error(err, "newLinkFunc")
+			}
+
+			p.links = append(p.links, linkdef)
 		})
 	if err != nil {
 		p.Logger.Error(err, "LINKDEF_PUT")
 		return err
 	}
-	p.natsSubscriptions = append(p.natsSubscriptions, linkPut)
+	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_PUT] = linkPut
 
 	shutdown, err := p.natsConnection.Subscribe(p.Topics.LATTICE_SHUTDOWN,
 		func(_ *nats.Msg) {
-			p.shutdown <- struct{}{}
+			err := p.shutdownFunc()
+			if err != nil {
+				// TODO: handle this better?
+				log.Print("ERROR: " + err.Error())
+			}
 		})
 	if err != nil {
 		p.Logger.Error(err, "LATTICE_SHUTDOWN")
 		return err
 	}
-	p.natsSubscriptions = append(p.natsSubscriptions, shutdown)
+	p.natsSubscriptions[p.Topics.LATTICE_SHUTDOWN] = shutdown
 	return nil
 }
 
-func (wp WasmcloudProvider) SendDownLattice(actorID string, msg []byte, op string) ([]byte, error) {
+func (wp WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]byte, error) {
 	guid := uuid.New().String()
 
 	i := core.Invocation{
@@ -319,8 +320,6 @@ func (wp WasmcloudProvider) SendDownLattice(actorID string, msg []byte, op strin
 		return nil, err
 	}
 
-	// d := cbor.NewDecoder(ir.Data)
-	// resp, err := core.CDecodeInvocationResponse(&d)
 	d := msgpack.NewDecoder(ir.Data)
 	resp, err := core.MDecodeInvocationResponse(&d)
 	wp.Logger.Error(err, "SDL")

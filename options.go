@@ -17,9 +17,20 @@ func WithNewLinkFunc(inFunc func(ActorConfig) error) ProviderOption {
 				return err
 			}
 
-			wp.links = append(wp.links, a)
 			go wp.listenForActor(a.ActorID)
+			return nil
+		}
+		return nil
+	}
+}
 
+func WithDelLinkFunc(inFunc func(ActorConfig) error) ProviderOption {
+	return func(wp *WasmcloudProvider) error {
+		wp.delLinkFunc = func(a ActorConfig) error {
+			err := inFunc(a)
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 		return nil

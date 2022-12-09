@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats.go v1.20.0
 	github.com/nats-io/nkeys v0.3.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20221207211951-730867f0b1e5
+	github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20221209164602-fdc369f19921
 	github.com/wasmcloud/tinygo-msgpack v0.1.4
 )
 

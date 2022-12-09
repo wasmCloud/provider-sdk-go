@@ -1,5 +1,7 @@
 package provider
 
+import core "github.com/wasmcloud/interfaces/core/tinygo"
+
 type ProviderOption func(*WasmcloudProvider) error
 
 func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, error)) ProviderOption {
@@ -9,28 +11,34 @@ func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, erro
 	}
 }
 
-func WithNewLinkFunc(inFunc func(ActorConfig) error) ProviderOption {
+func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.newLinkFunc = func(a ActorConfig) error {
-			err := inFunc(a)
+		wp.newLinkFunc = func(linkdef core.LinkDefinition) error {
+			err := inFunc(linkdef)
 			if err != nil {
 				return err
 			}
 
-			go wp.listenForActor(a.ActorID)
+			go wp.listenForActor(linkdef.ActorId)
+			wp.links = append(wp.links, linkdef)
+
 			return nil
 		}
 		return nil
 	}
 }
 
-func WithDelLinkFunc(inFunc func(ActorConfig) error) ProviderOption {
+func WithDelLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.delLinkFunc = func(a ActorConfig) error {
-			err := inFunc(a)
+		wp.delLinkFunc = func(linkdef core.LinkDefinition) error {
+			err := inFunc(linkdef)
 			if err != nil {
 				return err
 			}
+			// shutdown specific NATs subscription
+			wp.natsSubscriptions[linkdef.ActorId].Drain()
+			wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
+
 			return nil
 		}
 		return nil

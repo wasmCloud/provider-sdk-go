@@ -39,10 +39,10 @@ type WasmcloudProvider struct {
 	shutdownFunc func() error
 	shutdown     chan struct{}
 
-	newLinkFunc func(ActorConfig) error
-	delLinkFunc func(ActorConfig) error
-	newLink     chan ActorConfig
-	links       []core.LinkDefinition
+	newLinkFunc func(core.LinkDefinition) error
+	delLinkFunc func(core.LinkDefinition) error
+	// newLink     chan core.LinkDefinition
+	links []core.LinkDefinition
 
 	providerActionFunc func(ProviderAction) (*ProviderResponse, error)
 }
@@ -93,10 +93,10 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 		shutdownFunc: func() error { return nil },
 		shutdown:     make(chan struct{}),
 
-		newLinkFunc: func(ActorConfig) error { return nil },
-		delLinkFunc: func(ActorConfig) error { return nil },
-		newLink:     make(chan ActorConfig),
-		links:       hostData.LinkDefinitions,
+		newLinkFunc: func(core.LinkDefinition) error { return nil },
+		delLinkFunc: func(core.LinkDefinition) error { return nil },
+		// newLink:     make(chan ActorConfig),
+		links: hostData.LinkDefinitions,
 
 		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
 			return &ProviderResponse{}, nil
@@ -114,7 +114,7 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 	for _, link := range provider.links {
 		provider.Logger.Info(fmt.Sprintf("Evaluating link: %v", link.ProviderId))
 		if link.ProviderId == provider.Id {
-			provider.newLinkFunc(ActorConfig{link.ActorId, link.Values})
+			provider.newLinkFunc(link)
 		}
 	}
 
@@ -190,6 +190,7 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 }
 
 func (p *WasmcloudProvider) subToNats() error {
+	// ------------------ Subscribe to Health topic --------------------
 	health, err := p.natsConnection.Subscribe(p.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
 			hc := core.HealthCheckResponse{
@@ -213,24 +214,20 @@ func (p *WasmcloudProvider) subToNats() error {
 	}
 	p.natsSubscriptions[p.Topics.LATTICE_HEALTH] = health
 
+	// ------------------ Subscribe to Delete link topic --------------
 	linkDel, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_DEL,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-
 			linkdef, err := core.MDecodeLinkDefinition(&d)
 			if err != nil {
 				return
 			}
 
-			err = p.delLinkFunc(ActorConfig{linkdef.ActorId, linkdef.Values})
+			err = p.delLinkFunc(linkdef)
 			if err != nil {
 				p.Logger.Error(err, "failed to delete link")
 				return
 			}
-
-			// shutdown specific NATs subscription
-			p.natsSubscriptions[linkdef.ActorId].Drain()
-			p.natsSubscriptions[linkdef.ActorId].Unsubscribe()
 		})
 	if err != nil {
 		p.Logger.Error(err, "LINKDEF_DEL")
@@ -238,6 +235,7 @@ func (p *WasmcloudProvider) subToNats() error {
 	}
 	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_DEL] = linkDel
 
+	// ------------------ Subscribe to New link topic --------------
 	linkPut, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_PUT,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
@@ -246,14 +244,11 @@ func (p *WasmcloudProvider) subToNats() error {
 				return
 			}
 
-			// TODO: newLinkFunc needs to take a core.LinkDefination
-			err = p.newLinkFunc(ActorConfig{linkdef.ActorId, linkdef.Values})
+			err = p.newLinkFunc(linkdef)
 			if err != nil {
 				// TODO: handle this better?
 				p.Logger.Error(err, "newLinkFunc")
 			}
-
-			p.links = append(p.links, linkdef)
 		})
 	if err != nil {
 		p.Logger.Error(err, "LINKDEF_PUT")
@@ -261,6 +256,7 @@ func (p *WasmcloudProvider) subToNats() error {
 	}
 	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_PUT] = linkPut
 
+	// ------------------ Subscribe to Shutdown topic ------------------
 	shutdown, err := p.natsConnection.Subscribe(p.Topics.LATTICE_SHUTDOWN,
 		func(_ *nats.Msg) {
 			err := p.shutdownFunc()

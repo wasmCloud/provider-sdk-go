@@ -7,11 +7,6 @@ import (
 	core "github.com/wasmcloud/interfaces/core/tinygo"
 )
 
-type ActorConfig struct {
-	ActorID     string
-	ActorConfig map[string]string
-}
-
 type Claims struct {
 	jwt.StandardClaims
 	ID     string `json:"jti"`

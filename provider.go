@@ -112,7 +112,6 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 
 	// TODO: start listening on existing links
 	for _, link := range provider.links {
-		provider.Logger.Info(fmt.Sprintf("Evaluating link: %v", link.ProviderId))
 		if link.ProviderId == provider.Id {
 			provider.newLinkFunc(link)
 		}
@@ -296,6 +295,7 @@ func (wp WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]by
 
 	err := EncodeClaims(&i, wp.hostData, guid)
 	if err != nil {
+		wp.Logger.Error(err, "Failed to encode claims")
 		return nil, err
 	}
 
@@ -303,22 +303,18 @@ func (wp WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]by
 
 	// NC Request
 	subj := fmt.Sprintf("wasmbus.rpc.%s.%s", wp.hostData.LatticeRpcPrefix, actorID)
-	wp.Logger.Info("Encoded invocation sent",
-		map[string]interface{}{
-			"subj": subj,
-			"op":   op,
-			"msg":  msg,
-		},
-	)
-
 	ir, err := wp.natsConnection.Request(subj, natsBody, 2*time.Second)
 	if err != nil {
+		wp.Logger.Error(err, "NATs request failed")
 		return nil, err
 	}
 
 	d := msgpack.NewDecoder(ir.Data)
 	resp, err := core.MDecodeInvocationResponse(&d)
-	wp.Logger.Error(err, "SDL")
+	if err != nil {
+		wp.Logger.Error(err, "Failed to decode invocation response")
+		return nil, err
+	}
 
 	return resp.Msg, nil
 }

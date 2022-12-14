@@ -120,11 +120,11 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 	return provider, nil
 }
 
-func (wp WasmcloudProvider) HostData() core.HostData {
+func (wp *WasmcloudProvider) HostData() core.HostData {
 	return wp.hostData
 }
 
-func (wp WasmcloudProvider) Start() error {
+func (wp *WasmcloudProvider) Start() error {
 	err := wp.subToNats()
 	if err != nil {
 		return err
@@ -134,14 +134,14 @@ func (wp WasmcloudProvider) Start() error {
 	return nil
 }
 
-func (p *WasmcloudProvider) listenForActor(actorID string) {
+func (wp *WasmcloudProvider) listenForActor(actorID string) {
 	subj := fmt.Sprintf("wasmbus.rpc.%s.%s.%s",
-		p.hostData.LinkName,
-		p.hostData.ProviderKey,
-		p.hostData.LinkName,
+		wp.hostData.LinkName,
+		wp.hostData.ProviderKey,
+		wp.hostData.LinkName,
 	)
 
-	actorsub, err := p.natsConnection.Subscribe(subj,
+	actorsub, err := wp.natsConnection.Subscribe(subj,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
 			i, err := core.MDecodeInvocation(&d)
@@ -156,7 +156,7 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 			}
 
 			// TODO: need to set default
-			resp, err := p.providerActionFunc(payload)
+			resp, err := wp.providerActionFunc(payload)
 			if err != nil {
 				// TODO: what to do with this error
 				return
@@ -169,52 +169,40 @@ func (p *WasmcloudProvider) listenForActor(actorID string) {
 				ContentLength: uint64(len(resp.Msg)),
 			}
 
-			var sizer msgpack.Sizer
-			size_enc := &sizer
-			ir.MEncode(size_enc)
-			buf := make([]byte, sizer.Len())
-			encoder := msgpack.NewEncoder(buf)
-			enc := &encoder
-			ir.MEncode(enc)
+			buf := MEncode(&ir)
 
-			p.natsConnection.Publish(m.Reply, buf)
+			wp.natsConnection.Publish(m.Reply, buf)
 		})
 
 	if err != nil {
-		p.Logger.Error(err, "ACTOR_SUB")
+		wp.Logger.Error(err, "ACTOR_SUB")
 		return
 	}
 
-	p.natsSubscriptions[actorID] = actorsub
+	wp.natsSubscriptions[actorID] = actorsub
 }
 
-func (p *WasmcloudProvider) subToNats() error {
+func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Health topic --------------------
-	health, err := p.natsConnection.Subscribe(p.Topics.LATTICE_HEALTH,
+	health, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
 			hc := core.HealthCheckResponse{
 				Healthy: true,
-				Message: p.healthMsgFunc(),
+				Message: wp.healthMsgFunc(),
 			}
 
-			var sizer msgpack.Sizer
-			size_enc := &sizer
-			hc.MEncode(size_enc)
-			buf := make([]byte, sizer.Len())
-			encoder := msgpack.NewEncoder(buf)
-			enc := &encoder
-			hc.MEncode(enc)
+			buf := MEncode(&hc)
 
-			p.natsConnection.Publish(m.Reply, buf)
+			wp.natsConnection.Publish(m.Reply, buf)
 		})
 	if err != nil {
-		p.Logger.Error(err, "LATTICE_HEALTH")
+		wp.Logger.Error(err, "LATTICE_HEALTH")
 		return err
 	}
-	p.natsSubscriptions[p.Topics.LATTICE_HEALTH] = health
+	wp.natsSubscriptions[wp.Topics.LATTICE_HEALTH] = health
 
 	// ------------------ Subscribe to Delete link topic --------------
-	linkDel, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_DEL,
+	linkDel, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_DEL,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
 			linkdef, err := core.MDecodeLinkDefinition(&d)
@@ -222,20 +210,20 @@ func (p *WasmcloudProvider) subToNats() error {
 				return
 			}
 
-			err = p.delLinkFunc(linkdef)
+			err = wp.delLinkFunc(linkdef)
 			if err != nil {
-				p.Logger.Error(err, "failed to delete link")
+				wp.Logger.Error(err, "failed to delete link")
 				return
 			}
 		})
 	if err != nil {
-		p.Logger.Error(err, "LINKDEF_DEL")
+		wp.Logger.Error(err, "LINKDEF_DEL")
 		return err
 	}
-	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_DEL] = linkDel
+	wp.natsSubscriptions[wp.Topics.LATTICE_LINKDEF_DEL] = linkDel
 
 	// ------------------ Subscribe to New link topic --------------
-	linkPut, err := p.natsConnection.Subscribe(p.Topics.LATTICE_LINKDEF_PUT,
+	linkPut, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_PUT,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
 			linkdef, err := core.MDecodeLinkDefinition(&d)
@@ -243,36 +231,36 @@ func (p *WasmcloudProvider) subToNats() error {
 				return
 			}
 
-			err = p.newLinkFunc(linkdef)
+			err = wp.newLinkFunc(linkdef)
 			if err != nil {
 				// TODO: handle this better?
-				p.Logger.Error(err, "newLinkFunc")
+				wp.Logger.Error(err, "newLinkFunc")
 			}
 		})
 	if err != nil {
-		p.Logger.Error(err, "LINKDEF_PUT")
+		wp.Logger.Error(err, "LINKDEF_PUT")
 		return err
 	}
-	p.natsSubscriptions[p.Topics.LATTICE_LINKDEF_PUT] = linkPut
+	wp.natsSubscriptions[wp.Topics.LATTICE_LINKDEF_PUT] = linkPut
 
 	// ------------------ Subscribe to Shutdown topic ------------------
-	shutdown, err := p.natsConnection.Subscribe(p.Topics.LATTICE_SHUTDOWN,
+	shutdown, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_SHUTDOWN,
 		func(_ *nats.Msg) {
-			err := p.shutdownFunc()
+			err := wp.shutdownFunc()
 			if err != nil {
 				// TODO: handle this better?
 				log.Print("ERROR: " + err.Error())
 			}
 		})
 	if err != nil {
-		p.Logger.Error(err, "LATTICE_SHUTDOWN")
+		wp.Logger.Error(err, "LATTICE_SHUTDOWN")
 		return err
 	}
-	p.natsSubscriptions[p.Topics.LATTICE_SHUTDOWN] = shutdown
+	wp.natsSubscriptions[wp.Topics.LATTICE_SHUTDOWN] = shutdown
 	return nil
 }
 
-func (wp WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]byte, error) {
+func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]byte, error) {
 	guid := uuid.New().String()
 
 	i := core.Invocation{
@@ -299,7 +287,7 @@ func (wp WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]by
 		return nil, err
 	}
 
-	natsBody := EncodeInvocation(i)
+	natsBody := MEncode(&i)
 
 	// NC Request
 	subj := fmt.Sprintf("wasmbus.rpc.%s.%s", wp.hostData.LatticeRpcPrefix, actorID)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/bombsimon/logrusr/v3"
@@ -41,13 +42,14 @@ type WasmcloudProvider struct {
 
 	newLinkFunc func(core.LinkDefinition) error
 	delLinkFunc func(core.LinkDefinition) error
-	// newLink     chan core.LinkDefinition
-	links []core.LinkDefinition
+
+	lock  sync.Mutex
+	links map[string]core.LinkDefinition
 
 	providerActionFunc func(ProviderAction) (*ProviderResponse, error)
 }
 
-func New(contract string, options ...func(*WasmcloudProvider) error) (*WasmcloudProvider, error) {
+func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error) {
 	logrusLog := logrus.New()
 	logrusLog.SetFormatter(&logrus.JSONFormatter{})
 
@@ -96,7 +98,7 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 		newLinkFunc: func(core.LinkDefinition) error { return nil },
 		delLinkFunc: func(core.LinkDefinition) error { return nil },
 		// newLink:     make(chan ActorConfig),
-		links: hostData.LinkDefinitions,
+		links: make(map[string]core.LinkDefinition, len(hostData.LinkDefinitions)),
 
 		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
 			return &ProviderResponse{}, nil
@@ -111,7 +113,7 @@ func New(contract string, options ...func(*WasmcloudProvider) error) (*Wasmcloud
 	}
 
 	// TODO: start listening on existing links
-	for _, link := range provider.links {
+	for _, link := range hostData.LinkDefinitions {
 		if link.ProviderId == provider.Id {
 			provider.newLinkFunc(link)
 		}
@@ -149,6 +151,11 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 				return
 			}
 
+			if err := wp.validateProviderInvocation(i); err != nil {
+				wp.Logger.Error(err, "validate provider invocation failed")
+				return
+			}
+
 			payload := ProviderAction{
 				Operation: i.Operation,
 				Msg:       i.Msg,
@@ -182,6 +189,19 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 	wp.natsSubscriptions[actorID] = actorsub
 }
 
+func (wp *WasmcloudProvider) validateProviderInvocation(invocation core.Invocation) error {
+	// todo validate claims issuer is included in cluster issuers
+
+	if invocation.Target.PublicKey != wp.hostData.ProviderKey {
+		return fmt.Errorf("target key mismatch: %s != %s", invocation.Target.PublicKey, wp.hostData.HostId)
+	}
+
+	if !wp.isLinked(invocation.Origin.PublicKey) {
+		return fmt.Errorf("unlinked actor: %s", invocation.Origin.PublicKey)
+	}
+	return nil
+}
+
 func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Health topic --------------------
 	health, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_HEALTH,
@@ -207,6 +227,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 			d := msgpack.NewDecoder(m.Data)
 			linkdef, err := core.MDecodeLinkDefinition(&d)
 			if err != nil {
+				wp.Logger.Error(err, "failed to decode link")
 				return
 			}
 
@@ -228,6 +249,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 			d := msgpack.NewDecoder(m.Data)
 			linkdef, err := core.MDecodeLinkDefinition(&d)
 			if err != nil {
+				wp.Logger.Error(err, "failed to decode link")
 				return
 			}
 
@@ -305,4 +327,23 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 	}
 
 	return resp.Msg, nil
+}
+
+func (wp *WasmcloudProvider) putLink(l core.LinkDefinition) {
+	wp.lock.Lock()
+	defer wp.lock.Unlock()
+	wp.links[l.ActorId] = l
+}
+
+func (wp *WasmcloudProvider) deleteLink(l core.LinkDefinition) {
+	wp.lock.Lock()
+	defer wp.lock.Unlock()
+	delete(wp.links, l.ActorId)
+}
+
+func (wp *WasmcloudProvider) isLinked(actorId string) bool {
+	wp.lock.Lock()
+	defer wp.lock.Unlock()
+	_, exist := wp.links[actorId]
+	return exist
 }

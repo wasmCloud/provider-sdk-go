@@ -331,19 +331,19 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 
 func (wp *WasmcloudProvider) putLink(l core.LinkDefinition) {
 	wp.lock.Lock()
+	defer wp.lock.Unlock()
 	wp.links[l.ActorId] = l
-	wp.lock.Unlock()
 }
 
 func (wp *WasmcloudProvider) deleteLink(l core.LinkDefinition) {
 	wp.lock.Lock()
+	defer wp.lock.Unlock()
 	delete(wp.links, l.ActorId)
-	wp.lock.Unlock()
 }
 
 func (wp *WasmcloudProvider) isLinked(actorId string) bool {
 	wp.lock.Lock()
+	defer wp.lock.Unlock()
 	_, exist := wp.links[actorId]
-	wp.lock.Unlock()
 	return exist
 }

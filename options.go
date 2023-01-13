@@ -1,12 +1,8 @@
 package provider
 
 import (
-	"errors"
-
 	core "github.com/wasmcloud/interfaces/core/tinygo"
 )
-
-var ErrDuplicateLink = errors.New("duplicate link")
 
 type ProviderOption func(*WasmcloudProvider) error
 
@@ -22,7 +18,7 @@ func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 		wp.newLinkFunc = func(linkdef core.LinkDefinition) error {
 			if wp.isLinked(linkdef.ActorId) {
 				wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
-				return ErrDuplicateLink
+				return nil
 			}
 			err := inFunc(linkdef)
 			if err != nil {

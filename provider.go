@@ -131,17 +131,14 @@ func (wp *WasmcloudProvider) Start() error {
 	if err != nil {
 		return err
 	}
+	go wp.listenForActor()
 
 	<-wp.context.Done()
 	return nil
 }
 
-func (wp *WasmcloudProvider) listenForActor(actorID string) {
-	subj := fmt.Sprintf("wasmbus.rpc.%s.%s.%s",
-		wp.hostData.LinkName,
-		wp.hostData.ProviderKey,
-		wp.hostData.LinkName,
-	)
+func (wp *WasmcloudProvider) listenForActor() {
+	subj := wp.providerRpcTopic()
 
 	actorsub, err := wp.natsConnection.Subscribe(subj,
 		func(m *nats.Msg) {
@@ -159,7 +156,7 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 			payload := ProviderAction{
 				Operation: i.Operation,
 				Msg:       i.Msg,
-				FromActor: actorID,
+				FromActor: i.Origin.PublicKey,
 			}
 
 			// TODO: need to set default
@@ -186,7 +183,15 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 		return
 	}
 
-	wp.natsSubscriptions[actorID] = actorsub
+	wp.natsSubscriptions[subj] = actorsub
+}
+
+func (wp *WasmcloudProvider) providerRpcTopic() string {
+	return fmt.Sprintf("wasmbus.rpc.%s.%s.%s",
+		wp.hostData.LatticeRpcPrefix,
+		wp.hostData.ProviderKey,
+		wp.hostData.LinkName,
+	)
 }
 
 func (wp *WasmcloudProvider) validateProviderInvocation(invocation core.Invocation) error {

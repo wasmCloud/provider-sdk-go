@@ -25,7 +25,6 @@ func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 				return err
 			}
 
-			go wp.listenForActor(linkdef.ActorId)
 			wp.putLink(linkdef)
 
 			return nil
@@ -41,10 +40,7 @@ func WithDelLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 			if err != nil {
 				return err
 			}
-			// shutdown specific NATs subscription
-			wp.natsSubscriptions[linkdef.ActorId].Drain()
-			wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
-			
+
 			wp.deleteLink(linkdef)
 
 			return nil

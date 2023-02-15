@@ -69,6 +69,11 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: Where is the level wash is configured to?
+	// WASMCLOUD_STRUCTURED_LOG_LEVEL in host data?
+	logrusLog.SetLevel(logrus.ErrorLevel)
+
 	nc, err := nats.Connect(hostData.LatticeRpcUrl)
 	if err != nil {
 		return nil, err
@@ -97,7 +102,7 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 
 		newLinkFunc: func(core.LinkDefinition) error { return nil },
 		delLinkFunc: func(core.LinkDefinition) error { return nil },
-		// newLink:     make(chan ActorConfig),
+
 		links: make(map[string]core.LinkDefinition, len(hostData.LinkDefinitions)),
 
 		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
@@ -112,7 +117,6 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 		}
 	}
 
-	// TODO: start listening on existing links
 	for _, link := range hostData.LinkDefinitions {
 		if link.ProviderId == provider.Id {
 			provider.newLinkFunc(link)

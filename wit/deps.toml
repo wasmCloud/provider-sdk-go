@@ -1,0 +1,2 @@
+wasmcloud-core = "./core"
+logging = "https://github.com/WebAssembly/wasi-logging/archive/main.tar.gz"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang-jwt/jwt"
-	core "github.com/wasmcloud/interfaces/core/tinygo"
+	wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
 )
 
 type Claims struct {
@@ -32,7 +32,7 @@ type Topics struct {
 	LATTICE_HEALTH      string
 }
 
-func LatticeTopics(h core.HostData) Topics {
+func LatticeTopics(h wasmcloud_core.WasmcloudCoreTypesHostData) Topics {
 	return Topics{
 		LATTICE_LINKDEF_GET: fmt.Sprintf("wasmbus.rpc.%s.%s.%s.linkdefs.get", h.LatticeRpcPrefix, h.ProviderKey, h.LinkName),
 		LATTICE_LINKDEF_DEL: fmt.Sprintf("wasmbus.rpc.%s.%s.%s.linkdefs.del", h.LatticeRpcPrefix, h.ProviderKey, h.LinkName),

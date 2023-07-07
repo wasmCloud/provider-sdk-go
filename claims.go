@@ -11,10 +11,10 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/nats-io/nkeys"
 
-	core "github.com/wasmcloud/interfaces/core/tinygo"
+	wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
 )
 
-func EncodeClaims(i *core.Invocation, hostData core.HostData, guid string) error {
+func EncodeClaims(i *wasmcloud_core.WasmcloudCoreTypesInvocation, hostData wasmcloud_core.WasmcloudCoreTypesHostData, guid string) error {
 	var Ed25519SigningMethod jwt.SigningMethodEd25519
 	jwt.RegisterSigningMethod("Ed25519", func() jwt.SigningMethod { return &Ed25519SigningMethod })
 
@@ -38,7 +38,7 @@ func EncodeClaims(i *core.Invocation, hostData core.HostData, guid string) error
 		return err
 	}
 
-	contract := strings.ReplaceAll(string(i.Origin.ContractId), ":", "/")
+	contract := strings.ReplaceAll(string(i.Origin.GetProvider().ContractId), ":", "/")
 	claims := Claims{
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt: time.Now().Unix(),
@@ -47,8 +47,8 @@ func EncodeClaims(i *core.Invocation, hostData core.HostData, guid string) error
 		},
 		ID: guid,
 		Wascap: Wascap{
-			TargetURL: "wasmbus://" + i.Target.PublicKey + "/" + i.Operation,
-			OriginURL: "wasmbus://" + contract + "/" + hostData.LinkName + "/" + i.Origin.PublicKey,
+			TargetURL: "wasmbus://" + i.Target.GetProvider().PublicKey + "/" + i.Operation,
+			OriginURL: "wasmbus://" + contract + "/" + hostData.LinkName + "/" + i.Origin.GetProvider().PublicKey,
 		},
 	}
 

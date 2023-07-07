@@ -1,8 +1,6 @@
 package provider
 
-import (
-	core "github.com/wasmcloud/interfaces/core/tinygo"
-)
+import wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
 
 type ProviderOption func(*WasmcloudProvider) error
 
@@ -13,9 +11,9 @@ func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, erro
 	}
 }
 
-func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
+func WithNewLinkFunc(inFunc func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.newLinkFunc = func(linkdef core.LinkDefinition) error {
+		wp.newLinkFunc = func(linkdef wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error {
 			if wp.isLinked(linkdef.ActorId) {
 				wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
 				return nil
@@ -34,9 +32,9 @@ func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 	}
 }
 
-func WithDelLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
+func WithDelLinkFunc(inFunc func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.delLinkFunc = func(linkdef core.LinkDefinition) error {
+		wp.delLinkFunc = func(linkdef wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error {
 			err := inFunc(linkdef)
 			if err != nil {
 				return err
@@ -44,11 +42,12 @@ func WithDelLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
 			// shutdown specific NATs subscription
 			wp.natsSubscriptions[linkdef.ActorId].Drain()
 			wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
-			
+
 			wp.deleteLink(linkdef)
 
 			return nil
 		}
+
 		return nil
 	}
 }

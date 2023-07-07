@@ -1,5 +1,7 @@
 package provider
 
+//go:generate wit-bindgen tiny-go ./wit/deps/wasmcloud-core/ --out-dir core/ -w wasmcloud-core
+
 import (
 	"bufio"
 	"context"
@@ -17,7 +19,7 @@ import (
 	nats "github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	core "github.com/wasmcloud/interfaces/core/tinygo"
+	wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
 	msgpack "github.com/wasmcloud/tinygo-msgpack"
 )
 
@@ -28,7 +30,7 @@ type WasmcloudProvider struct {
 	cancel  context.CancelFunc
 	Logger  logr.Logger
 
-	hostData   core.HostData
+	hostData   wasmcloud_core.WasmcloudCoreTypesHostData
 	contractId string
 	Topics     Topics
 
@@ -40,11 +42,11 @@ type WasmcloudProvider struct {
 	shutdownFunc func() error
 	shutdown     chan struct{}
 
-	newLinkFunc func(core.LinkDefinition) error
-	delLinkFunc func(core.LinkDefinition) error
+	newLinkFunc func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error
+	delLinkFunc func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error
 
 	lock  sync.Mutex
-	links map[string]core.LinkDefinition
+	links map[string]wasmcloud_core.WasmcloudCoreTypesLinkDefinition
 
 	providerActionFunc func(ProviderAction) (*ProviderResponse, error)
 }
@@ -64,7 +66,7 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 		return nil, err
 	}
 
-	hostData := core.HostData{}
+	hostData := wasmcloud_core.WasmcloudCoreTypesHostData{}
 	err = json.Unmarshal([]byte(hostDataDecoded), &hostData)
 	if err != nil {
 		return nil, err
@@ -95,10 +97,10 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 		shutdownFunc: func() error { return nil },
 		shutdown:     make(chan struct{}),
 
-		newLinkFunc: func(core.LinkDefinition) error { return nil },
-		delLinkFunc: func(core.LinkDefinition) error { return nil },
+		newLinkFunc: func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error { return nil },
+		delLinkFunc: func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error { return nil },
 		// newLink:     make(chan ActorConfig),
-		links: make(map[string]core.LinkDefinition, len(hostData.LinkDefinitions)),
+		links: make(map[string]wasmcloud_core.WasmcloudCoreTypesLinkDefinition, len(hostData.LinkDefinitions)),
 
 		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
 			return &ProviderResponse{}, nil
@@ -122,7 +124,7 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 	return provider, nil
 }
 
-func (wp *WasmcloudProvider) HostData() core.HostData {
+func (wp *WasmcloudProvider) HostData() wasmcloud_core.WasmcloudCoreTypesHostData {
 	return wp.hostData
 }
 
@@ -146,7 +148,7 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 	actorsub, err := wp.natsConnection.Subscribe(subj,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-			i, err := core.MDecodeInvocation(&d)
+			i, err := MDecodeInvocation(&d)
 			if err != nil {
 				return
 			}
@@ -169,9 +171,12 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 				return
 			}
 
-			ir := core.InvocationResponse{
+			errMsg := wasmcloud_core.Option[string]{}
+			errMsg.Set(resp.Error)
+
+			ir := wasmcloud_core.WasmcloudCoreTypesInvocationResponse{
 				Msg:           resp.Msg,
-				Error:         resp.Error,
+				Error:         errMsg,
 				InvocationId:  i.Id,
 				ContentLength: uint64(len(resp.Msg)),
 			}
@@ -189,15 +194,15 @@ func (wp *WasmcloudProvider) listenForActor(actorID string) {
 	wp.natsSubscriptions[actorID] = actorsub
 }
 
-func (wp *WasmcloudProvider) validateProviderInvocation(invocation core.Invocation) error {
+func (wp *WasmcloudProvider) validateProviderInvocation(invocation wasmcloud_core.WasmcloudCoreTypesInvocation) error {
 	// todo validate claims issuer is included in cluster issuers
 
-	if invocation.Target.PublicKey != wp.hostData.ProviderKey {
-		return fmt.Errorf("target key mismatch: %s != %s", invocation.Target.PublicKey, wp.hostData.HostId)
+	if invocation.Target.GetProvider().PublicKey != wp.hostData.ProviderKey {
+		return fmt.Errorf("target key mismatch: %s != %s", invocation.Target.GetProvider().PublicKey, wp.hostData.HostId)
 	}
 
-	if !wp.isLinked(invocation.Origin.PublicKey) {
-		return fmt.Errorf("unlinked actor: %s", invocation.Origin.PublicKey)
+	if !wp.isLinked(invocation.Origin.GetActor()) {
+		return fmt.Errorf("unlinked actor: %s", invocation.Origin.GetActor())
 	}
 	return nil
 }
@@ -206,7 +211,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Health topic --------------------
 	health, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
-			hc := core.HealthCheckResponse{
+			hc := wasmcloud_core.WasmcloudCoreTypesHealthCheckResponse{
 				Healthy: true,
 				Message: wp.healthMsgFunc(),
 			}
@@ -225,7 +230,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 	linkDel, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_DEL,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-			linkdef, err := core.MDecodeLinkDefinition(&d)
+			linkdef, err := MDecodeLinkDefinition(&d)
 			if err != nil {
 				wp.Logger.Error(err, "failed to decode link")
 				return
@@ -247,7 +252,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 	linkPut, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_PUT,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-			linkdef, err := core.MDecodeLinkDefinition(&d)
+			linkdef, err := MDecodeLinkDefinition(&d)
 			if err != nil {
 				wp.Logger.Error(err, "failed to decode link")
 				return
@@ -285,21 +290,23 @@ func (wp *WasmcloudProvider) subToNats() error {
 func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]byte, error) {
 	guid := uuid.New().String()
 
-	i := core.Invocation{
-		Origin: core.WasmCloudEntity{
-			PublicKey:  wp.hostData.ProviderKey,
-			LinkName:   wp.hostData.LinkName,
-			ContractId: core.CapabilityContractId(wp.contractId),
-		},
-		Target: core.WasmCloudEntity{
-			PublicKey:  actorID,
-			LinkName:   wp.hostData.LinkName,
-			ContractId: core.CapabilityContractId(wp.contractId),
-		},
+	target := wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity{}
+	target.SetActor(actorID)
+
+	origin := wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity{}
+	origin.SetProvider(wasmcloud_core.WasmcloudCoreTypesProviderIdentifier{
+		PublicKey:  wp.hostData.ProviderKey,
+		LinkName:   wp.hostData.LinkName,
+		ContractId: wp.contractId,
+	})
+
+	i := wasmcloud_core.WasmcloudCoreTypesInvocation{
+		Origin:        origin,
+		Target:        target,
 		Operation:     op,
 		Msg:           msg,
 		Id:            guid,
-		HostId:        wp.hostData.HostId,
+		SourceHostId:  wp.hostData.HostId,
 		ContentLength: uint64(len([]byte(msg))),
 	}
 
@@ -320,7 +327,7 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 	}
 
 	d := msgpack.NewDecoder(ir.Data)
-	resp, err := core.MDecodeInvocationResponse(&d)
+	resp, err := MDecodeInvocationResponse(&d)
 	if err != nil {
 		wp.Logger.Error(err, "Failed to decode invocation response")
 		return nil, err
@@ -329,13 +336,13 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 	return resp.Msg, nil
 }
 
-func (wp *WasmcloudProvider) putLink(l core.LinkDefinition) {
+func (wp *WasmcloudProvider) putLink(l wasmcloud_core.WasmcloudCoreTypesLinkDefinition) {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
 	wp.links[l.ActorId] = l
 }
 
-func (wp *WasmcloudProvider) deleteLink(l core.LinkDefinition) {
+func (wp *WasmcloudProvider) deleteLink(l wasmcloud_core.WasmcloudCoreTypesLinkDefinition) {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
 	delete(wp.links, l.ActorId)

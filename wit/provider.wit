@@ -1,0 +1,5 @@
+package wasmcloud:provider@0.1.0
+
+world wasmcloud-provider {
+  use wasmcloud:core/types@0.1.0.{invocation, invocation-response, link-definition, host-data}
+}

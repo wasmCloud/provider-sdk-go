@@ -87,34 +87,17 @@ func MDecodeLinkDefinition(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreType
 		case "contract_id":
 			val.ContractId, err = d.ReadString()
 		case "values":
-			val.Values, err = MDecodeLinkSettings(d)
+			var v []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
+			opt := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
+			v, err = MDecodeLinkSettings(d)
+			opt.Set(v)
+			val.Values = opt
 		default:
 			err = d.Skip()
 		}
 		if err != nil {
 			return val, err
 		}
-	}
-	return val, nil
-}
-
-func MDecodeLinkSettings(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesLinkSettings, error) {
-	isNil, err := d.IsNextNil()
-	if err != nil || isNil {
-		return make(map[string]string, 0), err
-	}
-	size, err := d.ReadMapSize()
-	if err != nil {
-		return make(map[string]string, 0), err
-	}
-	val := make(map[string]string, size)
-	for i := uint32(0); i < size; i++ {
-		k, _ := d.ReadString()
-		v, err := d.ReadString()
-		if err != nil {
-			return val, err
-		}
-		val[k] = v
 	}
 	return val, nil
 }
@@ -140,7 +123,11 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 		case "invocation_id":
 			val.InvocationId, err = d.ReadString()
 		case "error":
-			val.Error, err = d.ReadString()
+			var v string
+			opt := wasmcloud_core.Option[string]{}
+			v, err = d.ReadString()
+			opt.Set(v)
+			val.Error = opt
 		case "content_length":
 			val.ContentLength, err = d.ReadUint64()
 		default:
@@ -153,7 +140,40 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 	return val, nil
 }
 
-func MDecodeWasmCloudEntity(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity, error) {
+func MDecodeWasmCloudEntityActor(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity, error) {
+	var val wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity
+	val.SetActor()
+	isNil, err := d.IsNextNil()
+	if err != nil || isNil {
+		return val, err
+	}
+	size, err := d.ReadMapSize()
+	if err != nil {
+		return val, err
+	}
+	for i := uint32(0); i < size; i++ {
+		field, err := d.ReadString()
+		if err != nil {
+			return val, err
+		}
+		switch field {
+		case "public_key":
+			val.PublicKey, err = d.ReadString()
+		case "link_name":
+			val.LinkName, err = d.ReadString()
+		case "contract_id":
+			val.ContractId, err = MDecodeCapabilityContractId(d)
+		default:
+			err = d.Skip()
+		}
+		if err != nil {
+			return val, err
+		}
+	}
+	return val, nil
+}
+
+func MDecodeWasmCloudEntityProvider(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity, error) {
 	var val wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity
 	isNil, err := d.IsNextNil()
 	if err != nil || isNil {
@@ -185,23 +205,24 @@ func MDecodeWasmCloudEntity(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTyp
 	return val, nil
 }
 
-func MDecodeTraceContext(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesTraceContext, error) {
+func MDecodeTraceContext(d *msgpack.Decoder) ([]wasmcloud_core.WasmcloudCoreTypesTraceContext, error) {
 	isNil, err := d.IsNextNil()
 	if err != nil || isNil {
-		return make(map[string]string, 0), err
+		return []wasmcloud_core.WasmcloudCoreTypesTraceContext{}, err
 	}
-	size, err := d.ReadMapSize()
+	size, err := d.ReadArraySize()
 	if err != nil {
-		return make(map[string]string, 0), err
+		return []wasmcloud_core.WasmcloudCoreTypesTraceContext{}, err
 	}
-	val := make(map[string]string, size)
+	val := make([]wasmcloud_core.WasmcloudCoreTypesTraceContext, size)
 	for i := uint32(0); i < size; i++ {
-		k, _ := d.ReadString()
-		v, err := d.ReadString()
+		tVal := wasmcloud_core.WasmcloudCoreTypesTraceContext{}
+		tVal.F0, _ = d.ReadString()
+		tVal.F1, err = d.ReadString()
 		if err != nil {
 			return val, err
 		}
-		val[k] = v
+		val = append(val, tVal)
 	}
 	return val, nil
 }
@@ -214,23 +235,24 @@ func MDecodeCapabilityContractId(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCo
 	return wasmcloud_core.WasmcloudCoreTypesCapabilityContractId(val), nil
 }
 
-func MDecodeLinkSettings(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesLinkSettings, error) {
+func MDecodeLinkSettings(d *msgpack.Decoder) ([]wasmcloud_core.WasmcloudCoreTypesLinkSettings, error) {
 	isNil, err := d.IsNextNil()
 	if err != nil || isNil {
-		return make(map[string]string, 0), err
+		return []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}, err
 	}
-	size, err := d.ReadMapSize()
+	size, err := d.ReadArraySize()
 	if err != nil {
-		return make(map[string]string, 0), err
+		return []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}, err
 	}
-	val := make(map[string]string, size)
+	val := make([]wasmcloud_core.WasmcloudCoreTypesLinkSettings, size)
 	for i := uint32(0); i < size; i++ {
-		k, _ := d.ReadString()
-		v, err := d.ReadString()
+		tVal := wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}
+		tVal.F0, _ = d.ReadString()
+		tVal.F1, err = d.ReadString()
 		if err != nil {
 			return val, err
 		}
-		val[k] = v
+		val = append(val, tVal)
 	}
 	return val, nil
 }

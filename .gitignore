@@ -1,0 +1,4 @@
+core/wasmcloud-core.go
+core/wasmcloud-core_types.go
+wit/core/
+wit/deps/

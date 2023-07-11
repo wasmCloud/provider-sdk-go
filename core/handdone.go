@@ -1,6 +1,8 @@
 package wasmcloud_core
 
 import (
+	"errors"
+
 	msgpack "github.com/wasmcloud/tinygo-msgpack"
 )
 
@@ -35,9 +37,15 @@ func (o *WasmcloudCoreTypesHealthCheckResponse) MEncode(encoder msgpack.Writer) 
 func (o *WasmcloudCoreTypesInvocation) MEncode(encoder msgpack.Writer) error {
 	encoder.WriteMapSize(9)
 	encoder.WriteString("origin")
-	o.Origin.MEncode(encoder)
+	err := o.Origin.MEncode(encoder)
+	if err != nil {
+		return err
+	}
 	encoder.WriteString("target")
-	o.Target.MEncode(encoder)
+	err = o.Target.MEncode(encoder)
+	if err != nil {
+		return err
+	}
 	encoder.WriteString("operation")
 	encoder.WriteString(o.Operation)
 	encoder.WriteString("msg")
@@ -51,11 +59,44 @@ func (o *WasmcloudCoreTypesInvocation) MEncode(encoder msgpack.Writer) error {
 	encoder.WriteString("content_length")
 	encoder.WriteUint64(o.ContentLength)
 	encoder.WriteString("traceContext")
-	if o.TraceContext == nil {
-		encoder.WriteNil()
-	} else {
-		o.TraceContext.MEncode(encoder)
-	}
+	//if o.TraceContext == nil {
+	encoder.WriteNil()
+	//} else {
+	//	o.TraceContext.MEncode(encoder)
+	//}
 
+	if encoder.CheckError() != nil {
+		panic(encoder.CheckError())
+	}
+	return encoder.CheckError()
+}
+
+func (o *WasmcloudCoreTypesWasmcloudEntity) MEncode(encoder msgpack.Writer) error {
+
+	switch o.Kind() {
+	case 0: //actor
+		actor := o.GetActor()
+		encoder.WriteMapSize(2)
+		encoder.WriteString("entity_type")
+		encoder.WriteInt8(0)
+		encoder.WriteString("public_key")
+		encoder.WriteString(actor)
+	case 1: //provider
+		provider := o.GetProvider()
+		encoder.WriteMapSize(4)
+		encoder.WriteString("entity_type")
+		encoder.WriteInt8(1)
+		encoder.WriteString("public_key")
+		encoder.WriteString(provider.PublicKey)
+		encoder.WriteString("link_name")
+		encoder.WriteString(provider.PublicKey)
+		encoder.WriteString("contract_id")
+		encoder.WriteString(provider.ContractId)
+	default:
+		return errors.New("invalid kind of wasmcloud entitiy")
+	}
+	if encoder.CheckError() != nil {
+		panic(encoder.CheckError())
+	}
 	return encoder.CheckError()
 }

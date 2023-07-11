@@ -96,3 +96,50 @@ func TestEncodeDecodeWasmcloudEntityProvider(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, a, b)
 }
+
+func TestEncodeDecodeLinkDefinationsNone(t *testing.T) {
+	val := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
+	val.Unset()
+	assert.True(t, val.IsNone())
+
+	a := wasmcloud_core.WasmcloudCoreTypesLinkDefinition{
+		ActorId:    "actor-id",
+		ProviderId: "provider-id",
+		LinkName:   "default",
+		ContractId: "Wasmcloud:Tester",
+		Values:     val,
+	}
+
+	buf := provider.MEncode(&a)
+
+	assert.NotNil(t, buf)
+
+	dec := msgpack.NewDecoder(buf)
+	b, err := provider.MDecodeLinkDefinition(&dec)
+
+	assert.NoError(t, err)
+	assert.Equal(t, a, b)
+}
+
+func TestEncodeDecodeLinkDefinationsSome(t *testing.T) {
+	val := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
+	val.Set([]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{{F0: "foo", F1: "bar"}})
+	assert.True(t, val.IsSome())
+
+	a := wasmcloud_core.WasmcloudCoreTypesLinkDefinition{
+		ActorId:    "actor-id",
+		ProviderId: "provider-id",
+		LinkName:   "default",
+		ContractId: "Wasmcloud:Tester",
+		Values:     val,
+	}
+
+	buf := provider.MEncode(&a)
+	assert.NotNil(t, buf)
+
+	dec := msgpack.NewDecoder(buf)
+	b, err := provider.MDecodeLinkDefinition(&dec)
+
+	assert.NoError(t, err)
+	assert.Equal(t, a, b)
+}

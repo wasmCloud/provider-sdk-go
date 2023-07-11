@@ -106,3 +106,38 @@ func (o *WasmcloudCoreTypesTuple2StringStringT) MEncode(encoder msgpack.Writer) 
 	encoder.WriteString(o.F1)
 	return encoder.CheckError()
 }
+
+func (o *WasmcloudCoreTypesLinkDefinition) MEncode(encoder msgpack.Writer) error {
+	encoder.WriteMapSize(5)
+	encoder.WriteString("actor_id")
+	encoder.WriteString(o.ActorId)
+	encoder.WriteString("provider_id")
+	encoder.WriteString(o.ProviderId)
+	encoder.WriteString("link_name")
+	encoder.WriteString(o.LinkName)
+	encoder.WriteString("contract_id")
+	encoder.WriteString(o.ContractId)
+	encoder.WriteString("values")
+	if o.Values.IsNone() {
+		encoder.WriteNil()
+	} else {
+		o.Values.MEncode(encoder)
+	}
+	return encoder.CheckError()
+}
+
+func (o *Option[T]) MEncode(encoder msgpack.Writer) error {
+	if o.IsSome() {
+		val := o.Unwrap()
+		switch tVal := any(val).(type) {
+		case []WasmcloudCoreTypesTuple2StringStringT:
+			encoder.WriteArraySize(uint32(len(tVal)))
+			for _, b := range tVal {
+				b.MEncode(encoder)
+			}
+		default:
+			return errors.New("invalid option type")
+		}
+	}
+	return encoder.CheckError()
+}

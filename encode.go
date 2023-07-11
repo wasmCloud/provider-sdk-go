@@ -89,11 +89,22 @@ func MDecodeLinkDefinition(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreType
 		case "contract_id":
 			val.ContractId, err = d.ReadString()
 		case "values":
-			var v []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
-			opt := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
-			v, err = MDecodeLinkSettings(d)
-			opt.Set(v)
-			val.Values = opt
+			isNone, err := d.IsNextNil() // means Option == None
+			if err != nil {
+				return val, err
+			}
+
+			if !isNone {
+				var v []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
+				opt := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
+				v, err = MDecodeLinkSettings(d)
+				if err != nil {
+					return val, err
+				}
+				opt.Set(v)
+				val.Values = opt
+			}
+
 		default:
 			err = d.Skip()
 		}
@@ -292,19 +303,19 @@ func MDecodeLinkSettings(d *msgpack.Decoder) ([]wasmcloud_core.WasmcloudCoreType
 	if err != nil || isNil {
 		return []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}, err
 	}
+
 	size, err := d.ReadArraySize()
 	if err != nil {
 		return []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}, err
 	}
-	val := make([]wasmcloud_core.WasmcloudCoreTypesLinkSettings, size)
+
+	val := []wasmcloud_core.WasmcloudCoreTypesLinkSettings{}
 	for i := uint32(0); i < size; i++ {
-		tVal := wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT{}
-		tVal.F0, _ = d.ReadString()
-		tVal.F1, err = d.ReadString()
+		tT, err := MDecodeTuple2String(d)
 		if err != nil {
-			return val, err
+			return []wasmcloud_core.WasmcloudCoreTypesTraceContext{}, err
 		}
-		val = append(val, tVal)
+		val = append(val, tT)
 	}
 	return val, nil
 }

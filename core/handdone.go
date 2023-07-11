@@ -59,20 +59,19 @@ func (o *WasmcloudCoreTypesInvocation) MEncode(encoder msgpack.Writer) error {
 	encoder.WriteString("content_length")
 	encoder.WriteUint64(o.ContentLength)
 	encoder.WriteString("traceContext")
-	//if o.TraceContext == nil {
-	encoder.WriteNil()
-	//} else {
-	//	o.TraceContext.MEncode(encoder)
-	//}
-
-	if encoder.CheckError() != nil {
-		panic(encoder.CheckError())
+	if o.TraceContext == nil {
+		encoder.WriteNil()
+	} else {
+		encoder.WriteArraySize(uint32(len(o.TraceContext)))
+		for _, b := range o.TraceContext {
+			b.MEncode(encoder)
+		}
 	}
+
 	return encoder.CheckError()
 }
 
 func (o *WasmcloudCoreTypesWasmcloudEntity) MEncode(encoder msgpack.Writer) error {
-
 	switch o.Kind() {
 	case 0: //actor
 		actor := o.GetActor()
@@ -89,14 +88,21 @@ func (o *WasmcloudCoreTypesWasmcloudEntity) MEncode(encoder msgpack.Writer) erro
 		encoder.WriteString("public_key")
 		encoder.WriteString(provider.PublicKey)
 		encoder.WriteString("link_name")
-		encoder.WriteString(provider.PublicKey)
+		encoder.WriteString(provider.LinkName)
 		encoder.WriteString("contract_id")
 		encoder.WriteString(provider.ContractId)
 	default:
 		return errors.New("invalid kind of wasmcloud entitiy")
 	}
-	if encoder.CheckError() != nil {
-		panic(encoder.CheckError())
-	}
+
+	return encoder.CheckError()
+}
+
+func (o *WasmcloudCoreTypesTuple2StringStringT) MEncode(encoder msgpack.Writer) error {
+	encoder.WriteMapSize(2)
+	encoder.WriteString("f0")
+	encoder.WriteString(o.F0)
+	encoder.WriteString("f1")
+	encoder.WriteString(o.F1)
 	return encoder.CheckError()
 }

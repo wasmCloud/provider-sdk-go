@@ -62,3 +62,37 @@ func TestEncodeDecodeInvocation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, a, b)
 }
+
+func TestEncodeDecodeWasmcloudEntityActor(t *testing.T) {
+	a := wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity{}
+	a.SetActor("iamanactor")
+
+	buf := provider.MEncode(&a)
+
+	assert.NotNil(t, buf)
+
+	dec := msgpack.NewDecoder(buf)
+	b, err := provider.MDecodeWasmCloudEntity(&dec)
+
+	assert.NoError(t, err)
+	assert.Equal(t, a, b)
+}
+
+func TestEncodeDecodeWasmcloudEntityProvider(t *testing.T) {
+	a := wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity{}
+	a.SetProvider(wasmcloud_core.WasmcloudCoreTypesProviderIdentifier{
+		PublicKey:  "iamsuperpublic",
+		ContractId: "contract:topsecret",
+		LinkName:   "default",
+	})
+
+	buf := provider.MEncode(&a)
+
+	assert.NotNil(t, buf)
+
+	dec := msgpack.NewDecoder(buf)
+	b, err := provider.MDecodeWasmCloudEntity(&dec)
+
+	assert.NoError(t, err)
+	assert.Equal(t, a, b)
+}

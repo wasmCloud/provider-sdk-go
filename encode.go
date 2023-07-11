@@ -144,40 +144,83 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 
 func MDecodeWasmCloudEntity(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity, error) {
 	var val wasmcloud_core.WasmcloudCoreTypesWasmcloudEntity
-
 	isNil, err := d.IsNextNil()
 	if err != nil || isNil {
 		return val, err
 	}
-	//size, err := d.ReadMapSize()
-	//if err != nil {
-	//	return val, err
-	//}
 
-	field, err := d.ReadInt8() //entity_type field
+	size, err := d.ReadMapSize()
 	if err != nil {
 		return val, err
 	}
 
-	switch field {
+	field, err := d.ReadString() //entity_type field
+	if err != nil {
+		return val, err
+	}
+
+	var eType int8
+	if field == "entity_type" {
+		eType, err = d.ReadInt8()
+		if err != nil {
+			return val, err
+		}
+	} else {
+		return val, errors.New("unexpected field in entity_type location")
+	}
+
+	switch eType {
 	case 0: // actor_id
-		ps, err := d.ReadString() // public_key field
-		if err != nil {
-			return val, err
+		for i := uint32(1); i < size; i++ {
+			field, err := d.ReadString() // public_key field
+			if err != nil {
+				return val, err
+			}
+
+			switch field {
+			case "public_key":
+				ps, err := d.ReadString()
+				if err != nil {
+					return val, err
+				}
+				val.SetActor(ps)
+			default:
+				d.Skip()
+			}
+
 		}
-		val.SetActor(ps)
+
 	case 1: // provider
-		ps, err := d.ReadString()
-		ln, err := d.ReadString()
-		cid, err := d.ReadString()
-		if err != nil {
-			return val, err
+		weid := wasmcloud_core.WasmcloudCoreTypesProviderIdentifier{}
+
+		for i := uint32(1); i < size; i++ {
+			field, err := d.ReadString() // public_key field
+			if err != nil {
+				return val, err
+			}
+
+			switch field {
+			case "public_key":
+				weid.PublicKey, err = d.ReadString()
+				if err != nil {
+					return val, err
+				}
+			case "link_name":
+				weid.LinkName, err = d.ReadString()
+				if err != nil {
+					return val, err
+				}
+			case "contract_id":
+				weid.ContractId, err = d.ReadString()
+				if err != nil {
+					return val, err
+				}
+			default:
+				d.Skip()
+			}
+
+			val.SetProvider(weid)
 		}
-		val.SetProvider(wasmcloud_core.WasmcloudCoreTypesProviderIdentifier{
-			PublicKey:  ps,
-			ContractId: cid,
-			LinkName:   ln,
-		})
 	default:
 		return val, errors.New("invalid wasmcloud entity type")
 	}
@@ -194,15 +237,44 @@ func MDecodeTraceContext(d *msgpack.Decoder) ([]wasmcloud_core.WasmcloudCoreType
 	if err != nil {
 		return []wasmcloud_core.WasmcloudCoreTypesTraceContext{}, err
 	}
-	val := make([]wasmcloud_core.WasmcloudCoreTypesTraceContext, size)
+
+	val := []wasmcloud_core.WasmcloudCoreTypesTraceContext{}
 	for i := uint32(0); i < size; i++ {
-		tVal := wasmcloud_core.WasmcloudCoreTypesTraceContext{}
-		tVal.F0, _ = d.ReadString()
-		tVal.F1, err = d.ReadString()
+		tT, err := MDecodeTuple2String(d)
+		if err != nil {
+			return []wasmcloud_core.WasmcloudCoreTypesTraceContext{}, err
+		}
+		val = append(val, tT)
+	}
+	return val, nil
+}
+
+func MDecodeTuple2String(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT, error) {
+	var val wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
+	isNil, err := d.IsNextNil()
+	if err != nil || isNil {
+		return val, err
+	}
+	size, err := d.ReadMapSize()
+	if err != nil {
+		return val, err
+	}
+	for i := uint32(0); i < size; i++ {
+		field, err := d.ReadString()
 		if err != nil {
 			return val, err
 		}
-		val = append(val, tVal)
+		switch field {
+		case "f0":
+			val.F0, err = d.ReadString()
+		case "f1":
+			val.F1, err = d.ReadString()
+		default:
+			err = d.Skip()
+		}
+		if err != nil {
+			return val, err
+		}
 	}
 	return val, nil
 }

@@ -136,11 +136,21 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 		case "invocation_id":
 			val.InvocationId, err = d.ReadString()
 		case "error":
-			var v string
-			opt := wasmcloud_core.Option[string]{}
-			v, err = d.ReadString()
-			opt.Set(v)
-			val.Error = opt
+			isNone, err := d.IsNextNil() // means Option == None
+			if err != nil {
+				return val, err
+			}
+
+			if !isNone {
+				var v string
+				opt := wasmcloud_core.Option[string]{}
+				v, err = d.ReadString()
+				if err != nil {
+					return val, err
+				}
+				opt.Set(v)
+				val.Error = opt
+			}
 		case "content_length":
 			val.ContentLength, err = d.ReadUint64()
 		default:

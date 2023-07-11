@@ -6,24 +6,6 @@ import (
 	msgpack "github.com/wasmcloud/tinygo-msgpack"
 )
 
-func (o *WasmcloudCoreTypesInvocationResponse) MEncode(encoder msgpack.Writer) error {
-	encoder.WriteMapSize(4)
-	encoder.WriteString("msg")
-	encoder.WriteByteArray(o.Msg)
-	encoder.WriteString("invocation_id")
-	encoder.WriteString(o.InvocationId)
-	encoder.WriteString("error")
-	if o.Error.IsSome() {
-		encoder.WriteString(o.Error.Unwrap())
-	} else {
-		encoder.WriteNil()
-	}
-	encoder.WriteString("content_length")
-	encoder.WriteUint64(o.ContentLength)
-
-	return encoder.CheckError()
-}
-
 func (o *WasmcloudCoreTypesHealthCheckResponse) MEncode(encoder msgpack.Writer) error {
 	encoder.WriteMapSize(2)
 	encoder.WriteString("healthy")
@@ -126,6 +108,11 @@ func (o *WasmcloudCoreTypesLinkDefinition) MEncode(encoder msgpack.Writer) error
 	return encoder.CheckError()
 }
 
+func (o WasmcloudCoreTypesCapabilityContractId) MEncode(encoder msgpack.Writer) error {
+	encoder.WriteString(string(o))
+	return encoder.CheckError()
+}
+
 func (o *Option[T]) MEncode(encoder msgpack.Writer) error {
 	if o.IsSome() {
 		val := o.Unwrap()
@@ -135,9 +122,29 @@ func (o *Option[T]) MEncode(encoder msgpack.Writer) error {
 			for _, b := range tVal {
 				b.MEncode(encoder)
 			}
+		case string:
+			encoder.WriteString(tVal)
 		default:
 			return errors.New("invalid option type")
 		}
 	}
+	return encoder.CheckError()
+}
+
+func (o *WasmcloudCoreTypesInvocationResponse) MEncode(encoder msgpack.Writer) error {
+	encoder.WriteMapSize(4)
+	encoder.WriteString("msg")
+	encoder.WriteByteArray(o.Msg)
+	encoder.WriteString("invocation_id")
+	encoder.WriteString(o.InvocationId)
+	encoder.WriteString("error")
+	if o.Error.IsNone() {
+		encoder.WriteNil()
+	} else {
+		o.Error.MEncode(encoder)
+	}
+	encoder.WriteString("content_length")
+	encoder.WriteUint64(o.ContentLength)
+
 	return encoder.CheckError()
 }

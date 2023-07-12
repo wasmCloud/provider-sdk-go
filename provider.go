@@ -66,15 +66,12 @@ func New(contract string, options ...ProviderOption) (*WasmcloudProvider, error)
 		return nil, err
 	}
 
-	fmt.Println("--------", string(hostDataDecoded))
-
 	hostData := wasmcloud_core.WasmcloudCoreTypesHostData{}
 	err = json.Unmarshal([]byte(hostDataDecoded), &hostData)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("+++++++++", hostData)
 	nc, err := nats.Connect(hostData.LatticeRpcUrl)
 	if err != nil {
 		return nil, err

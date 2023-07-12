@@ -47,7 +47,7 @@ func EncodeClaims(i *wasmcloud_core.WasmcloudCoreTypesInvocation, hostData wasmc
 		},
 		ID: guid,
 		Wascap: Wascap{
-			TargetURL: "wasmbus://" + i.Target.GetProvider().PublicKey + "/" + i.Operation,
+			TargetURL: "wasmbus://" + i.Target.GetActor() + "/" + i.Operation,
 			OriginURL: "wasmbus://" + contract + "/" + hostData.LinkName + "/" + i.Origin.GetProvider().PublicKey,
 		},
 	}

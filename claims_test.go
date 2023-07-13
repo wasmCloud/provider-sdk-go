@@ -1,8 +1,6 @@
 package provider_test
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/golang-jwt/jwt"
@@ -46,17 +44,9 @@ func TestEncodeClaims(t *testing.T) {
 
 	var claims provider.Claims
 
-	_, err = jwt.ParseWithClaims(i.EncodedClaims, &claims, func(token *jwt.Token) (interface{}, error) {
+	_, _ = jwt.ParseWithClaims(i.EncodedClaims, &claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte("SCAJM3XPPWWGONF6JRV6ELRZQCXTEDZRX7RMVEWACCGXXYQP6N3SXI2IOM"), nil
 	})
-
-	// assert.NoError(t, err)
-
-	b, err := json.MarshalIndent(claims, "", "  ")
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Print(string(b))
 
 	assert.Equal(t, "68B0A4763B1073A1B961B3EF8E8128BC38A65906310C074606CFA2193FE848D6", claims.Wascap.Hash)
 }

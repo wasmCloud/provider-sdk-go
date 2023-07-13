@@ -231,7 +231,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 	linkDel, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_DEL,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-			linkdef, err := MDecodeLinkDefinition(&d)
+			linkdef, err := MDecodeLinkDefinition_BC(&d)
 			if err != nil {
 				wp.Logger.Error(err, "failed to decode link")
 				return
@@ -253,7 +253,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 	linkPut, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINKDEF_PUT,
 		func(m *nats.Msg) {
 			d := msgpack.NewDecoder(m.Data)
-			linkdef, err := MDecodeLinkDefinition(&d)
+			linkdef, err := MDecodeLinkDefinition_BC(&d)
 			if err != nil {
 				wp.Logger.Error(err, "failed to decode link")
 				return

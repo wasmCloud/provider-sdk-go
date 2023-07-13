@@ -119,19 +119,17 @@ func (o *WasmcloudCoreTypesWasmcloudEntity) MEncode_BC(encoder msgpack.Writer) e
 func (o *WasmcloudCoreTypesWasmcloudEntity) MEncode(encoder msgpack.Writer) error {
 	switch o.Kind() {
 	case WasmcloudCoreTypesWasmcloudEntityKindActor:
-		actor := o.GetActor()
 		encoder.WriteMapSize(1)
 		encoder.WriteString("public_key")
-		encoder.WriteString(actor)
+		encoder.WriteString(o.GetActor())
 	case WasmcloudCoreTypesWasmcloudEntityKindProvider:
-		provider := o.GetProvider()
 		encoder.WriteMapSize(3)
 		encoder.WriteString("public_key")
-		encoder.WriteString(provider.PublicKey)
+		encoder.WriteString(o.GetProvider().PublicKey)
 		encoder.WriteString("link_name")
-		encoder.WriteString(provider.LinkName)
+		encoder.WriteString(o.GetProvider().LinkName)
 		encoder.WriteString("contract_id")
-		encoder.WriteString(provider.ContractId)
+		encoder.WriteString(o.GetProvider().ContractId)
 	default:
 		return errors.New("invalid kind of wasmcloud entitiy")
 	}

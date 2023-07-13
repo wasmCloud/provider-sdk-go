@@ -210,7 +210,6 @@ func (wp *WasmcloudProvider) validateProviderInvocation(invocation wasmcloud_cor
 
 func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Health topic --------------------
-	fmt.Println("-----" + wp.Topics.LATTICE_HEALTH)
 	health, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
 			hc := wasmcloud_core.WasmcloudCoreTypesHealthCheckResponse{
@@ -318,7 +317,8 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 		return nil, err
 	}
 
-	natsBody := MEncode(&i)
+	// TODO: This BC means backwards compatable...I don't love it
+	natsBody := MEncode_BC(&i)
 
 	// NC Request
 	subj := fmt.Sprintf("wasmbus.rpc.%s.%s", wp.hostData.LatticeRpcPrefix, actorID)
@@ -329,6 +329,7 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 	}
 
 	d := msgpack.NewDecoder(ir.Data)
+
 	resp, err := MDecodeInvocationResponse(&d)
 	if err != nil {
 		wp.Logger.Error(err, "Failed to decode invocation response")

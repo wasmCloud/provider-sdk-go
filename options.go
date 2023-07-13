@@ -1,6 +1,8 @@
 package provider
 
-import wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
+import (
+	wasmcloud_core "github.com/wasmCloud/provider-sdk-go/core"
+)
 
 type ProviderOption func(*WasmcloudProvider) error
 
@@ -14,6 +16,7 @@ func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, erro
 func WithNewLinkFunc(inFunc func(wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
 		wp.newLinkFunc = func(linkdef wasmcloud_core.WasmcloudCoreTypesLinkDefinition) error {
+
 			if wp.isLinked(linkdef.ActorId) {
 				wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
 				return nil

@@ -11,12 +11,25 @@ type MEncodable interface {
 	MEncode(encoder msgpack.Writer) error
 }
 
+type MEncodable_BC interface {
+	MEncode_BC(encoder msgpack.Writer) error
+}
+
 func MEncode(v MEncodable) []byte {
 	var sizer msgpack.Sizer
 	v.MEncode(&sizer)
 	buf := make([]byte, sizer.Len())
 	encoder := msgpack.NewEncoder(buf)
 	v.MEncode(&encoder)
+	return buf
+}
+
+func MEncode_BC(v MEncodable_BC) []byte {
+	var sizer msgpack.Sizer
+	v.MEncode_BC(&sizer)
+	buf := make([]byte, sizer.Len())
+	encoder := msgpack.NewEncoder(buf)
+	v.MEncode_BC(&encoder)
 	return buf
 }
 
@@ -74,11 +87,13 @@ func MDecodeLinkDefinition(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreType
 	if err != nil {
 		return val, err
 	}
+
 	for i := uint32(0); i < size; i++ {
 		field, err := d.ReadString()
 		if err != nil {
 			return val, err
 		}
+
 		switch field {
 		case "actor_id":
 			val.ActorId, err = d.ReadString()
@@ -88,23 +103,25 @@ func MDecodeLinkDefinition(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCoreType
 			val.LinkName, err = d.ReadString()
 		case "contract_id":
 			val.ContractId, err = d.ReadString()
-		case "values":
-			isNone, err := d.IsNextNil() // means Option == None
-			if err != nil {
-				return val, err
-			}
-
-			if !isNone {
-				var v []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
-				opt := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
-				v, err = MDecodeLinkSettings(d)
-				if err != nil {
-					return val, err
-				}
-				opt.Set(v)
-				val.Values = opt
-			}
-
+			// TODO: values are an option<tuple<list>> in wit.  Needs a BC decoder
+			// that I haven't written yet
+			//
+		// case "values":
+		// 	isNone, err := d.IsNextNil() // means Option == None
+		// 	if err != nil {
+		// 		return val, err
+		// 	}
+		//
+		// 	if !isNone {
+		// 		var v []wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT
+		// 		opt := wasmcloud_core.Option[[]wasmcloud_core.WasmcloudCoreTypesTuple2StringStringT]{}
+		// 		v, err = MDecodeLinkSettings(d)
+		// 		if err != nil {
+		// 			return val, err
+		// 		}
+		// 		opt.Set(v)
+		// 		val.Values = opt
+		// 	}
 		default:
 			err = d.Skip()
 		}
@@ -121,10 +138,12 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 	if err != nil || isNil {
 		return val, err
 	}
+
 	size, err := d.ReadMapSize()
 	if err != nil {
 		return val, err
 	}
+
 	for i := uint32(0); i < size; i++ {
 		field, err := d.ReadString()
 		if err != nil {
@@ -133,6 +152,10 @@ func MDecodeInvocationResponse(d *msgpack.Decoder) (wasmcloud_core.WasmcloudCore
 		switch field {
 		case "msg":
 			val.Msg, err = d.ReadByteArray()
+			if err != nil {
+				val.Msg = nil
+				err = nil
+			}
 		case "invocation_id":
 			val.InvocationId, err = d.ReadString()
 		case "error":

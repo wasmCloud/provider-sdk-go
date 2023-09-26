@@ -34,8 +34,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20221212211611-51d99ad3427c h1:loCv560afyi1d0gHi+ft02Z2T+jHAYHd6xwzI6ulg9U=
-github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20221212211611-51d99ad3427c/go.mod h1:1m8Wppz1fugPLHnElqBsbzT6ZTZyzCh6Uwoy+m4EIrM=
+github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20230606141907-ea77eb34853a h1:iksIJWWH4E39oias00hUJTT2pKPSBKfaNNZ8Vvw9yNI=
+github.com/wasmcloud/interfaces/core/tinygo v0.0.0-20230606141907-ea77eb34853a/go.mod h1:1m8Wppz1fugPLHnElqBsbzT6ZTZyzCh6Uwoy+m4EIrM=
 github.com/wasmcloud/tinygo-cbor v0.1.0 h1:n9X+GK5XB3P8TJK4pSzGahcHUmMONW5pZ5f9lTCzsX8=
 github.com/wasmcloud/tinygo-cbor v0.1.0/go.mod h1:j7SE4KKfYiyAnLSdEcK2bEyyLA38yCDrGi1wLU+YETQ=
 github.com/wasmcloud/tinygo-msgpack v0.1.4 h1:jhZ0txnn+WiOuUCpulDjC7nHHpAaaxElF+KgXXYu3DA=

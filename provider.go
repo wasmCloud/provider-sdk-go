@@ -285,6 +285,9 @@ func (wp *WasmcloudProvider) subToNats() error {
 func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]byte, error) {
 	guid := uuid.New().String()
 
+	var tc core.TraceContext = make(map[string]string)
+	tc["a"] = "b" // BUG: this is a bug in the msgpack, no map can be empty
+
 	i := core.Invocation{
 		Origin: core.WasmCloudEntity{
 			PublicKey:  wp.hostData.ProviderKey,
@@ -292,15 +295,14 @@ func (wp *WasmcloudProvider) ToActor(actorID string, msg []byte, op string) ([]b
 			ContractId: core.CapabilityContractId(wp.contractId),
 		},
 		Target: core.WasmCloudEntity{
-			PublicKey:  actorID,
-			LinkName:   wp.hostData.LinkName,
-			ContractId: core.CapabilityContractId(wp.contractId),
+			PublicKey: actorID,
 		},
 		Operation:     op,
 		Msg:           msg,
 		Id:            guid,
 		HostId:        wp.hostData.HostId,
 		ContentLength: uint64(len([]byte(msg))),
+		TraceContext:  &tc,
 	}
 
 	err := EncodeClaims(&i, wp.hostData, guid)

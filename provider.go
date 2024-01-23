@@ -138,7 +138,7 @@ func (wp *WasmcloudProvider) Start() error {
 
 func (wp *WasmcloudProvider) listenForActor(actorID string) {
 	subj := fmt.Sprintf("wasmbus.rpc.%s.%s.%s",
-		wp.hostData.LinkName,
+		wp.hostData.LatticeRpcPrefix,
 		wp.hostData.ProviderKey,
 		wp.hostData.LinkName,
 	)

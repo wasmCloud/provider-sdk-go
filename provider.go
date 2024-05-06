@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/bombsimon/logrusr/v3"
 	"github.com/go-logr/logr"
@@ -21,8 +22,8 @@ type WasmcloudProvider struct {
 	cancel  context.CancelFunc
 	Logger  logr.Logger
 
-	hostData   HostData
-	Topics     Topics
+	hostData HostData
+	Topics   Topics
 
 	natsConnection    *nats.Conn
 	natsSubscriptions map[string]*nats.Subscription
@@ -32,44 +33,72 @@ type WasmcloudProvider struct {
 	shutdownFunc func() error
 	shutdown     chan struct{}
 
-	// newLinkFunc func(core.LinkDefinition) error
-	// delLinkFunc func(core.LinkDefinition) error
+	putSourceLinkFunc func(InterfaceLinkDefinition) error
+	putTargetLinkFunc func(InterfaceLinkDefinition) error
+	delSourceLinkFunc func(InterfaceLinkDefinition) error
+	delTargetLinkFunc func(InterfaceLinkDefinition) error
 
-	lock  sync.Mutex
+	lock sync.Mutex
 	// Links from the provider to other components, aka where the provider is the
 	// source of the link. Indexed by the component ID of the target
 	sourceLinks map[string]InterfaceLinkDefinition
-    // Links from other components to the provider, aka where the provider is the
-    // target of the link. Indexed by the component ID of the source
+	// Links from other components to the provider, aka where the provider is the
+	// target of the link. Indexed by the component ID of the source
 	targetLinks map[string]InterfaceLinkDefinition
-
-	providerActionFunc func(ProviderAction) (*ProviderResponse, error)
 }
 
-func New(options ...ProviderOption) (*WasmcloudProvider, error) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{})
-
+func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	reader := bufio.NewReader(os.Stdin)
-	// TODO: consider a better way to load?
-	hostDataRaw, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
 
-	// hostDataDecoded, err := base64.StdEncoding.DecodeString(hostDataRaw)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// Make a channel to receive the host data so we can timeout if we don't receive it
+	// All host data is sent immediately after the provider starts
+	hostDataChannel := make(chan string, 1)
+	go func() {
+		hostDataRaw, err := reader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		hostDataChannel <- hostDataRaw
+	}()
 
 	hostData := HostData{}
-	err = json.Unmarshal([]byte(hostDataRaw), &hostData)
-	if err != nil {
-		return nil, err
+	select {
+	case hostDataRaw := <-hostDataChannel:
+		err := json.Unmarshal([]byte(hostDataRaw), &hostData)
+		if err != nil {
+			return nil, err
+		}
+	case <-time.After(5 * time.Second):
+		panic("failed to read host data, did not receive after 5 seconds")
 	}
+
+	// Initialize Logging
+	logrusLog := logrus.New()
+	if hostData.StructuredLogging {
+		logrusLog.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		logrusLog.SetFormatter(&logrus.TextFormatter{})
+	}
+
+	// Connect to NATS
 	nc, err := nats.Connect(hostData.LatticeRPCURL)
 	if err != nil {
 		return nil, err
+	}
+
+	// partition links based on if the provider is the source or target
+	sourceLinks := []InterfaceLinkDefinition{}
+	targetLinks := []InterfaceLinkDefinition{}
+
+	// Loop over the numbers
+	for _, link := range hostData.LinkDefinitions {
+		if link.SourceID == hostData.ProviderKey {
+			sourceLinks = append(sourceLinks, link)
+		} else if link.Target == hostData.ProviderKey {
+			targetLinks = append(targetLinks, link)
+		} else {
+			logrusLog.Warnf("Link %s->%s is not connected to provider, ignoring", link.SourceID, link.Target)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,8 +110,8 @@ func New(options ...ProviderOption) (*WasmcloudProvider, error) {
 		Logger: logrusr.New(logrusLog).
 			WithName(hostData.HostID),
 
-		hostData:   hostData,
-		Topics:     LatticeTopics(hostData),
+		hostData: hostData,
+		Topics:   LatticeTopics(hostData),
 
 		natsConnection:    nc,
 		natsSubscriptions: map[string]*nats.Subscription{},
@@ -92,16 +121,13 @@ func New(options ...ProviderOption) (*WasmcloudProvider, error) {
 		shutdownFunc: func() error { return nil },
 		shutdown:     make(chan struct{}),
 
-		// newLinkFunc: func(core.LinkDefinition) error { return nil },
-		// delLinkFunc: func(core.LinkDefinition) error { return nil },
-		// newLink:     make(chan ActorConfig),
-		// TODO: shouldn't be that big
-		sourceLinks: make(map[string]InterfaceLinkDefinition, len(hostData.LinkDefinitions)),
-		targetLinks: make(map[string]InterfaceLinkDefinition, len(hostData.LinkDefinitions)),
+		putSourceLinkFunc: func(InterfaceLinkDefinition) error { return nil },
+		putTargetLinkFunc: func(InterfaceLinkDefinition) error { return nil },
+		delSourceLinkFunc: func(InterfaceLinkDefinition) error { return nil },
+		delTargetLinkFunc: func(InterfaceLinkDefinition) error { return nil },
 
-		providerActionFunc: func(a ProviderAction) (*ProviderResponse, error) {
-			return &ProviderResponse{}, nil
-		},
+		sourceLinks: make(map[string]InterfaceLinkDefinition, len(sourceLinks)),
+		targetLinks: make(map[string]InterfaceLinkDefinition, len(targetLinks)),
 	}
 
 	for _, opt := range options {
@@ -111,8 +137,10 @@ func New(options ...ProviderOption) (*WasmcloudProvider, error) {
 		}
 	}
 
-	// TODO: start listening on existing links
-	for _, link := range hostData.LinkDefinitions {
+	for _, link := range sourceLinks {
+		provider.putLink(link)
+	}
+	for _, link := range targetLinks {
 		provider.putLink(link)
 	}
 
@@ -129,6 +157,7 @@ func (wp *WasmcloudProvider) Start() error {
 		return err
 	}
 
+	wp.Logger.Info("provider started", "id", wp.Id)
 	<-wp.context.Done()
 	return nil
 }
@@ -159,22 +188,22 @@ func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Delete link topic --------------
 	linkDel, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINK_DEL,
 		func(m *nats.Msg) {
-			// TODO: decode link
-			// d := msgpack.NewDecoder(m.Data)
-			// linkdef, err := core.MDecodeLinkDefinition(&d)
-			// if err != nil {
-			// 	wp.Logger.Error(err, "failed to decode link")
-			// 	return
-			// }
+			link := InterfaceLinkDefinition{}
+			err := json.Unmarshal(m.Data, &link)
+			if err != nil {
+				wp.Logger.Error(err, "failed to decode link")
+				return
+			}
 
-			// err = wp.delLinkFunc(linkdef)
-			// if err != nil {
-			// 	wp.Logger.Error(err, "failed to delete link")
-			// 	return
-			// }
+			err = wp.deleteLink(link)
+			if err != nil {
+				// TODO(#10): handle better?
+				wp.Logger.Error(err, "failed to delete link")
+				return
+			}
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LINKDEF_DEL")
+		wp.Logger.Error(err, "LINK_DEL")
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_DEL] = linkDel
@@ -182,34 +211,50 @@ func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to New link topic --------------
 	linkPut, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINK_PUT,
 		func(m *nats.Msg) {
-			// TODO: decode link
-			// d := msgpack.NewDecoder(m.Data)
-			// linkdef, err := core.MDecodeLinkDefinition(&d)
-			// if err != nil {
-			// 	wp.Logger.Error(err, "failed to decode link")
-			// 	return
-			// }
+			link := InterfaceLinkDefinition{}
+			err := json.Unmarshal(m.Data, &link)
+			if err != nil {
+				wp.Logger.Error(err, "failed to decode link")
+				return
+			}
 
-			// err = wp.newLinkFunc(linkdef)
-			// if err != nil {
-			// 	// TODO: handle this better?
-			// 	wp.Logger.Error(err, "newLinkFunc")
-			// }
+			err = wp.putLink(link)
+			if err != nil {
+				// TODO(#10): handle this better?
+				wp.Logger.Error(err, "newLinkFunc")
+			}
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LINKDEF_PUT")
+		wp.Logger.Error(err, "LINK_PUT")
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_PUT] = linkPut
 
 	// ------------------ Subscribe to Shutdown topic ------------------
 	shutdown, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_SHUTDOWN,
-		func(_ *nats.Msg) {
+		func(m *nats.Msg) {
 			err := wp.shutdownFunc()
 			if err != nil {
-				// TODO: handle this better?
-				log.Print("ERROR: " + err.Error())
+				// TODO(#10): handle this better?
+				log.Print("ERROR: provider shutdown function failed: " + err.Error())
 			}
+
+			m.Respond([]byte("provider shutdown handled successfully"))
+			wp.natsConnection.Flush()
+
+			for _, s := range wp.natsSubscriptions {
+				err := s.Drain()
+				if err != nil {
+					log.Print("ERROR: provider shutdown failed to drain subscription: " + err.Error())
+				}
+			}
+
+			err = wp.natsConnection.Drain()
+			if err != nil {
+				log.Print("ERROR: provider shutdown failed to drain connection: " + err.Error())
+			}
+
+			wp.cancel()
 		})
 	if err != nil {
 		wp.Logger.Error(err, "LATTICE_SHUTDOWN")
@@ -219,20 +264,69 @@ func (wp *WasmcloudProvider) subToNats() error {
 	return nil
 }
 
-func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) {
+func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {
+	// Ignore duplicate links
+	if wp.isLinked(l.SourceID, l.Target) {
+		wp.Logger.Info("ignoring duplicate link", "link", l)
+		return nil
+	}
+
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
-	// wp.links[l.ActorId] = l
+	if l.SourceID == wp.Id {
+		err := wp.putSourceLinkFunc(l)
+		if err != nil {
+			return err
+		}
+
+		wp.sourceLinks[l.Target] = l
+	} else if l.Target == wp.Id {
+		err := wp.putTargetLinkFunc(l)
+		if err != nil {
+			return err
+		}
+
+		wp.targetLinks[l.SourceID] = l
+	} else {
+		wp.Logger.Info("received link that isn't for this provider, ignoring", "link", l)
+	}
+
+	return nil
 }
 
-func (wp *WasmcloudProvider) deleteLink(l InterfaceLinkDefinition) {
+func (wp *WasmcloudProvider) deleteLink(l InterfaceLinkDefinition) error {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
-	// delete(wp.links, l.ActorId)
+	if l.SourceID == wp.Id {
+		err := wp.delSourceLinkFunc(l)
+		if err != nil {
+			return err
+		}
+
+		delete(wp.sourceLinks, l.Target)
+	} else if l.Target == wp.Id {
+		err := wp.delTargetLinkFunc(l)
+		if err != nil {
+			return err
+		}
+		delete(wp.targetLinks, l.SourceID)
+	} else {
+		wp.Logger.Info("received link delete that isn't for this provider, ignoring", "link", l)
+	}
+
+	return nil
 }
 
-func (wp *WasmcloudProvider) isLinked(actorId string) bool {
+func (wp *WasmcloudProvider) isLinked(sourceId string, target string) bool {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
-	return false
+	if sourceId == wp.Id {
+		_, exists := wp.sourceLinks[target]
+		return exists
+	} else if target == wp.Id {
+		_, exists := wp.targetLinks[sourceId]
+		return exists
+	} else {
+		return false
+	}
 }

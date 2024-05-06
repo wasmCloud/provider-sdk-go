@@ -1,81 +1,43 @@
 package provider
 
-type ProviderOption func(*WasmcloudProvider) error
+type ProviderHandler func(*WasmcloudProvider) error
 
-func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, error)) ProviderOption {
+func SourceLinkPut(inFunc func(InterfaceLinkDefinition) error) ProviderHandler {
 	return func(wp *WasmcloudProvider) error {
-		wp.providerActionFunc = inFunc
+		wp.putSourceLinkFunc = inFunc
 		return nil
 	}
 }
 
-func WithNewLinkFunc(inFunc func(InterfaceLinkDefinition) error) ProviderOption {
+func TargetLinkPut(inFunc func(InterfaceLinkDefinition) error) ProviderHandler {
 	return func(wp *WasmcloudProvider) error {
-		// wp.newLinkFunc = func(linkdef InterfaceLinkDefinition) error {
-		// 	if wp.isLinked(linkdef.ActorId) {
-		// 		wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
-		// 		return nil
-		// 	}
-		// 	err := inFunc(linkdef)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// 	go wp.listenForActor(linkdef.ActorId)
-		// 	wp.putLink(linkdef)
-
-		// 	return nil
-		// }
+		wp.putTargetLinkFunc = inFunc
 		return nil
 	}
 }
 
-func WithDelLinkFunc(inFunc func(InterfaceLinkDefinition) error) ProviderOption {
+func SourceLinkDel(inFunc func(InterfaceLinkDefinition) error) ProviderHandler {
 	return func(wp *WasmcloudProvider) error {
-		// wp.delLinkFunc = func(linkdef InterfaceLinkDefinition) error {
-		// 	err := inFunc(linkdef)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	// shutdown specific NATs subscription
-		// 	wp.natsSubscriptions[linkdef.ActorId].Drain()
-		// 	wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
-			
-		// 	wp.deleteLink(linkdef)
-
-		// 	return nil
-		// }
+		wp.delSourceLinkFunc = inFunc
 		return nil
 	}
 }
 
-func WithShutdownFunc(inFunc func() error) ProviderOption {
+func TargetLinkDel(inFunc func(InterfaceLinkDefinition) error) ProviderHandler {
 	return func(wp *WasmcloudProvider) error {
-		wp.shutdownFunc = func() error {
-			err := inFunc()
-			if err != nil {
-				return err
-			}
-
-			for _, s := range wp.natsSubscriptions {
-				err := s.Drain()
-				if err != nil {
-					return err
-				}
-			}
-			err = wp.natsConnection.Drain()
-			if err != nil {
-				return err
-			}
-
-			wp.cancel()
-			return nil
-		}
+		wp.delTargetLinkFunc = inFunc
 		return nil
 	}
 }
 
-func WithHealthCheckMsg(inFunc func() string) ProviderOption {
+func Shutdown(inFunc func() error) ProviderHandler {
+	return func(wp *WasmcloudProvider) error {
+		wp.shutdownFunc = inFunc
+		return nil
+	}
+}
+
+func HealthCheck(inFunc func() string) ProviderHandler {
 	return func(wp *WasmcloudProvider) error {
 		wp.healthMsgFunc = inFunc
 		return nil

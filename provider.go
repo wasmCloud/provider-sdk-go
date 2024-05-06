@@ -166,9 +166,10 @@ func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to Health topic --------------------
 	health, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_HEALTH,
 		func(m *nats.Msg) {
+			msg := wp.healthMsgFunc()
 			hc := HealthCheckResponse{
 				Healthy: true,
-				Message: "healthy",
+				Message: msg,
 			}
 
 			hcBytes, err := json.Marshal(hc)

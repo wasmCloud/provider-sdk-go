@@ -1,9 +1,5 @@
 package provider
 
-import (
-	core "github.com/wasmcloud/interfaces/core/tinygo"
-)
-
 type ProviderOption func(*WasmcloudProvider) error
 
 func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, error)) ProviderOption {
@@ -13,42 +9,42 @@ func WithProviderActionFunc(inFunc func(ProviderAction) (*ProviderResponse, erro
 	}
 }
 
-func WithNewLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
+func WithNewLinkFunc(inFunc func(InterfaceLinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.newLinkFunc = func(linkdef core.LinkDefinition) error {
-			if wp.isLinked(linkdef.ActorId) {
-				wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
-				return nil
-			}
-			err := inFunc(linkdef)
-			if err != nil {
-				return err
-			}
+		// wp.newLinkFunc = func(linkdef InterfaceLinkDefinition) error {
+		// 	if wp.isLinked(linkdef.ActorId) {
+		// 		wp.Logger.Info("duplicate link", "actorId", linkdef.ActorId)
+		// 		return nil
+		// 	}
+		// 	err := inFunc(linkdef)
+		// 	if err != nil {
+		// 		return err
+		// 	}
 
-			go wp.listenForActor(linkdef.ActorId)
-			wp.putLink(linkdef)
+		// 	go wp.listenForActor(linkdef.ActorId)
+		// 	wp.putLink(linkdef)
 
-			return nil
-		}
+		// 	return nil
+		// }
 		return nil
 	}
 }
 
-func WithDelLinkFunc(inFunc func(core.LinkDefinition) error) ProviderOption {
+func WithDelLinkFunc(inFunc func(InterfaceLinkDefinition) error) ProviderOption {
 	return func(wp *WasmcloudProvider) error {
-		wp.delLinkFunc = func(linkdef core.LinkDefinition) error {
-			err := inFunc(linkdef)
-			if err != nil {
-				return err
-			}
-			// shutdown specific NATs subscription
-			wp.natsSubscriptions[linkdef.ActorId].Drain()
-			wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
+		// wp.delLinkFunc = func(linkdef InterfaceLinkDefinition) error {
+		// 	err := inFunc(linkdef)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	// shutdown specific NATs subscription
+		// 	wp.natsSubscriptions[linkdef.ActorId].Drain()
+		// 	wp.natsSubscriptions[linkdef.ActorId].Unsubscribe()
 			
-			wp.deleteLink(linkdef)
+		// 	wp.deleteLink(linkdef)
 
-			return nil
-		}
+		// 	return nil
+		// }
 		return nil
 	}
 }

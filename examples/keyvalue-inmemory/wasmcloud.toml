@@ -1,5 +1,5 @@
 # NOTE: Not yet supported
-name = "Blank Go"
+name = "KeyValue Go"
 language = "golang"
 type = "provider"
 version = "0.1.0"

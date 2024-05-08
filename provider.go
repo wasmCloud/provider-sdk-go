@@ -5,15 +5,20 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/bombsimon/logrusr/v3"
 	"github.com/go-logr/logr"
-	nats "github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+
+	nats "github.com/nats-io/nats.go"
+	wrpcnats "github.com/wrpc/wrpc/go/nats"
 )
 
 type WasmcloudProvider struct {
@@ -25,6 +30,8 @@ type WasmcloudProvider struct {
 
 	hostData HostData
 	Topics   Topics
+
+	RPCClient *wrpcnats.Client
 
 	natsConnection    *nats.Conn
 	natsSubscriptions map[string]*nats.Subscription
@@ -57,7 +64,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	go func() {
 		hostDataRaw, err := reader.ReadString('\n')
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		hostDataChannel <- hostDataRaw
 	}()
@@ -74,7 +81,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 			return nil, err
 		}
 	case <-time.After(5 * time.Second):
-		panic("failed to read host data, did not receive after 5 seconds")
+		log.Fatal("failed to read host data, did not receive after 5 seconds")
 	}
 
 	// Initialize Logging
@@ -106,17 +113,23 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		}
 	}
 
+	wrpc := wrpcnats.NewClient(nc, fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey))
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	provider := &WasmcloudProvider{
 		Id: hostData.ProviderKey,
+		Logger: logrusr.New(logrusLog).
+			WithName(hostData.HostID),
+		RPCClient: wrpc,
+		Topics:    LatticeTopics(hostData),
 
 		context: ctx,
 		cancel:  cancel,
-		Logger: logrusr.New(logrusLog).
-			WithName(hostData.HostID),
 
 		hostData: hostData,
-		Topics:   LatticeTopics(hostData),
 
 		natsConnection:    nc,
 		natsSubscriptions: map[string]*nats.Subscription{},
@@ -164,6 +177,24 @@ func (wp *WasmcloudProvider) Start() error {
 
 	wp.Logger.Info("provider started", "id", wp.Id)
 	<-wp.context.Done()
+	wp.Logger.Info("provider exiting", "id", wp.Id)
+	return nil
+}
+
+func (wp *WasmcloudProvider) Shutdown() error {
+	err := wp.shutdownFunc()
+	if err != nil {
+		wp.cancel()
+		return err
+	}
+
+	err = wp.cleanupNatsSubscriptions()
+	if err != nil {
+		wp.cancel()
+		return err
+	}
+
+	wp.cancel()
 	return nil
 }
 
@@ -242,22 +273,14 @@ func (wp *WasmcloudProvider) subToNats() error {
 			err := wp.shutdownFunc()
 			if err != nil {
 				// TODO(#10): handle this better?
-				log.Print("ERROR: provider shutdown function failed: " + err.Error())
+				log.Println("ERROR: provider shutdown function failed: " + err.Error())
 			}
 
 			m.Respond([]byte("provider shutdown handled successfully"))
-			wp.natsConnection.Flush()
 
-			for _, s := range wp.natsSubscriptions {
-				err := s.Drain()
-				if err != nil {
-					log.Print("ERROR: provider shutdown failed to drain subscription: " + err.Error())
-				}
-			}
-
-			err = wp.natsConnection.Drain()
+			err = wp.cleanupNatsSubscriptions()
 			if err != nil {
-				log.Print("ERROR: provider shutdown failed to drain connection: " + err.Error())
+				log.Println("ERROR: provider shutdown failed to drain connection: " + err.Error())
 			}
 
 			wp.cancel()
@@ -268,6 +291,23 @@ func (wp *WasmcloudProvider) subToNats() error {
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_SHUTDOWN] = shutdown
 	return nil
+}
+
+func (wp *WasmcloudProvider) cleanupNatsSubscriptions() error {
+	err := wp.natsConnection.Flush()
+	if err != nil {
+		return err
+	}
+
+	for _, s := range wp.natsSubscriptions {
+		err := s.Drain()
+		if err != nil {
+			// NOTE: This is a log message because we don't want to stop the shutdown process
+			log.Println("ERROR: provider shutdown failed to drain subscription: " + err.Error())
+		}
+	}
+
+	return wp.natsConnection.Drain()
 }
 
 func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {

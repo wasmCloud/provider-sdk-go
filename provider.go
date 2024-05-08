@@ -3,6 +3,7 @@ package provider
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"os"
@@ -64,7 +65,11 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	hostData := HostData{}
 	select {
 	case hostDataRaw := <-hostDataChannel:
-		err := json.Unmarshal([]byte(hostDataRaw), &hostData)
+		decodedData, err := base64.StdEncoding.DecodeString(hostDataRaw)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(decodedData, &hostData)
 		if err != nil {
 			return nil, err
 		}

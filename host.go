@@ -12,13 +12,12 @@ type OtelConfig struct {
 }
 
 type HostData struct {
-	HostID             string `json:"host_id,omitempty"`
-	LatticeRPCPrefix   string `json:"lattice_rpc_prefix,omitempty"`
-	LatticeRPCUserJWT  string `json:"lattice_rpc_user_jwt,omitempty"`
-	LatticeRPCUserSeed string `json:"lattice_rpc_user_seed,omitempty"`
-	LatticeRPCURL      string `json:"lattice_rpc_url,omitempty"`
-	ProviderKey        string `json:"provider_key,omitempty"`
-	// NOTE: Rust is trying to pass a Vec<(String, String)> here, can we support that?
+	HostID              string                    `json:"host_id,omitempty"`
+	LatticeRPCPrefix    string                    `json:"lattice_rpc_prefix,omitempty"`
+	LatticeRPCUserJWT   string                    `json:"lattice_rpc_user_jwt,omitempty"`
+	LatticeRPCUserSeed  string                    `json:"lattice_rpc_user_seed,omitempty"`
+	LatticeRPCURL       string                    `json:"lattice_rpc_url,omitempty"`
+	ProviderKey         string                    `json:"provider_key,omitempty"`
 	EnvValues           map[string]string         `json:"env_values,omitempty"`
 	InstanceID          string                    `json:"instance_id,omitempty"`
 	LinkDefinitions     []InterfaceLinkDefinition `json:"link_definitions,omitempty"`

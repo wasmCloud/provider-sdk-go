@@ -7,15 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/bombsimon/logrusr/v3"
-	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
 
 	nats "github.com/nats-io/nats.go"
 	wrpcnats "github.com/wrpc/wrpc/go/nats"
@@ -26,7 +23,7 @@ type WasmcloudProvider struct {
 
 	context context.Context
 	cancel  context.CancelFunc
-	Logger  logr.Logger
+	Logger  *slog.Logger
 
 	hostData HostData
 	Topics   Topics
@@ -85,11 +82,11 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	// Initialize Logging
-	logrusLog := logrus.New()
+	var logger *slog.Logger
 	if hostData.StructuredLogging {
-		logrusLog.SetFormatter(&logrus.JSONFormatter{})
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	} else {
-		logrusLog.SetFormatter(&logrus.TextFormatter{})
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 
 	// Connect to NATS
@@ -109,7 +106,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		} else if link.Target == hostData.ProviderKey {
 			targetLinks = append(targetLinks, link)
 		} else {
-			logrusLog.Warnf("Link %s->%s is not connected to provider, ignoring", link.SourceID, link.Target)
+			logger.Warn("Link %s->%s is not connected to provider, ignoring", link.SourceID, link.Target)
 		}
 	}
 
@@ -120,9 +117,8 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	provider := &WasmcloudProvider{
-		Id: hostData.ProviderKey,
-		Logger: logrusr.New(logrusLog).
-			WithName(hostData.HostID),
+		Id:        hostData.ProviderKey,
+		Logger:    logger,
 		RPCClient: wrpc,
 		Topics:    LatticeTopics(hostData),
 
@@ -210,14 +206,14 @@ func (wp *WasmcloudProvider) subToNats() error {
 
 			hcBytes, err := json.Marshal(hc)
 			if err != nil {
-				wp.Logger.Error(err, "failed to encode health check")
+				wp.Logger.Error("failed to encode health check", err)
 				return
 			}
 
 			wp.natsConnection.Publish(m.Reply, hcBytes)
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LATTICE_HEALTH")
+		wp.Logger.Error("LATTICE_HEALTH", err)
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_HEALTH] = health
@@ -228,19 +224,19 @@ func (wp *WasmcloudProvider) subToNats() error {
 			link := InterfaceLinkDefinition{}
 			err := json.Unmarshal(m.Data, &link)
 			if err != nil {
-				wp.Logger.Error(err, "failed to decode link")
+				wp.Logger.Error("failed to decode link", err)
 				return
 			}
 
 			err = wp.deleteLink(link)
 			if err != nil {
 				// TODO(#10): handle better?
-				wp.Logger.Error(err, "failed to delete link")
+				wp.Logger.Error("failed to delete link", err)
 				return
 			}
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LINK_DEL")
+		wp.Logger.Error("LINK_DEL", err)
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_DEL] = linkDel
@@ -251,18 +247,18 @@ func (wp *WasmcloudProvider) subToNats() error {
 			link := InterfaceLinkDefinition{}
 			err := json.Unmarshal(m.Data, &link)
 			if err != nil {
-				wp.Logger.Error(err, "failed to decode link")
+				wp.Logger.Error("failed to decode link", err)
 				return
 			}
 
 			err = wp.putLink(link)
 			if err != nil {
 				// TODO(#10): handle this better?
-				wp.Logger.Error(err, "newLinkFunc")
+				wp.Logger.Error("newLinkFunc", err)
 			}
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LINK_PUT")
+		wp.Logger.Error("LINK_PUT", err)
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_PUT] = linkPut
@@ -286,7 +282,7 @@ func (wp *WasmcloudProvider) subToNats() error {
 			wp.cancel()
 		})
 	if err != nil {
-		wp.Logger.Error(err, "LATTICE_SHUTDOWN")
+		wp.Logger.Error("LATTICE_SHUTDOWN", err)
 		return err
 	}
 	wp.natsSubscriptions[wp.Topics.LATTICE_SHUTDOWN] = shutdown

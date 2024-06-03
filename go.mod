@@ -5,10 +5,7 @@ go 1.22.2
 toolchain go1.22.3
 
 require (
-	github.com/bombsimon/logrusr/v3 v3.1.0
-	github.com/go-logr/logr v1.2.3
 	github.com/nats-io/nats.go v1.34.1
-	github.com/sirupsen/logrus v1.9.0
 	github.com/wrpc/wrpc/go v0.0.0-20240508154835-d040797e7796
 )
 

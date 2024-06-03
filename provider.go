@@ -173,6 +173,14 @@ func (wp *WasmcloudProvider) HostData() HostData {
 	return wp.hostData
 }
 
+func (wp *WasmcloudProvider) NatsConnection() *nats.Conn {
+	return wp.natsConnection
+}
+
+func (wp *WasmcloudProvider) OutgoingRpcClient(target string) *wrpcnats.Client {
+	return wrpcnats.NewClient(wp.natsConnection, fmt.Sprintf("%s.%s", wp.hostData.LatticeRPCPrefix, target))
+}
+
 func (wp *WasmcloudProvider) Start() error {
 	err := wp.subToNats()
 	if err != nil {

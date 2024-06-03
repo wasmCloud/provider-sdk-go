@@ -5,6 +5,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/wasmCloud/provider-sdk-go"
 	"github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings/exports/wrpc/keyvalue/store"
 	wrpc "github.com/wrpc/wrpc/go"
 )

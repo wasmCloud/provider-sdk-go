@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/wasmCloud/provider-sdk-go"
 	server "github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings"
 )
 
@@ -34,6 +35,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
 	providerCh := make(chan error, 1)
 	signalCh := make(chan os.Signal, 1)
 

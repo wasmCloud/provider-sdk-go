@@ -1,6 +1,6 @@
 # Keyvalue inmemory golang provider
 
-This provider implements `wasi:keyvalue/store@0.2.0-draft`.
+This provider implements `wrpc:keyvalue/store@0.2.0-draft`.
 
 ## Notable files
 

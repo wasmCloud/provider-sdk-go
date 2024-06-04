@@ -1,11 +1,5 @@
-> [!WARNING]
-> Experimental!
+# Golang SDK for wasmCloud Providers
 
-## Golang SDK for Providers
+This is an experimental SDK for writing wasmCloud providers in Go.
 
-This is a experimenal SDK for writing wasmCloud providers in Go.
-
-An example can be found in [cmd/keyvalue-inmemory](./cmd/keyvalue-inmemory/) which implements `wasi:keyvalue@0.2.0-draft`.
-
-A demo can be found at
-`ghcr.io/jordan-rash/kv-provider:v0.0.3`
+An example can be found in [examples/keyvalue-inmemory](./examples/keyvalue-inmemory/) which implements `wrpc:keyvalue/store@0.2.0-draft`.

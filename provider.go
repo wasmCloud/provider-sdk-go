@@ -73,6 +73,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		err = json.Unmarshal(decodedData, &hostData)
 		if err != nil {
 			return nil, err
@@ -152,10 +153,17 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	for _, link := range sourceLinks {
-		provider.putLink(link)
+		err := provider.putLink(link)
+		if err != nil {
+			logger.Error("failed to put source link", slog.Any("error", err))
+		}
 	}
+
 	for _, link := range targetLinks {
-		provider.putLink(link)
+		err := provider.putLink(link)
+		if err != nil {
+			logger.Error("failed to put target link", slog.Any("error", err))
+		}
 	}
 
 	return provider, nil
@@ -206,16 +214,21 @@ func (wp *WasmcloudProvider) subToNats() error {
 
 			hcBytes, err := json.Marshal(hc)
 			if err != nil {
-				wp.Logger.Error("failed to encode health check", err)
+				wp.Logger.Error("failed to encode health check", slog.Any("error", err))
 				return
 			}
 
-			wp.natsConnection.Publish(m.Reply, hcBytes)
+			err = wp.natsConnection.Publish(m.Reply, hcBytes)
+			if err != nil {
+				wp.Logger.Error("failed to publish health check response", slog.Any("error", err))
+			}
 		})
+
 	if err != nil {
-		wp.Logger.Error("LATTICE_HEALTH", err)
+		wp.Logger.Error("LATTICE_HEALTH", slog.Any("error", err))
 		return err
 	}
+
 	wp.natsSubscriptions[wp.Topics.LATTICE_HEALTH] = health
 
 	// ------------------ Subscribe to Delete link topic --------------
@@ -224,21 +237,22 @@ func (wp *WasmcloudProvider) subToNats() error {
 			link := InterfaceLinkDefinition{}
 			err := json.Unmarshal(m.Data, &link)
 			if err != nil {
-				wp.Logger.Error("failed to decode link", err)
+				wp.Logger.Error("failed to decode link", slog.Any("error", err))
 				return
 			}
 
 			err = wp.deleteLink(link)
 			if err != nil {
 				// TODO(#10): handle better?
-				wp.Logger.Error("failed to delete link", err)
+				wp.Logger.Error("failed to delete link", slog.Any("error", err))
 				return
 			}
 		})
 	if err != nil {
-		wp.Logger.Error("LINK_DEL", err)
+		wp.Logger.Error("LINK_DEL", slog.Any("error", err))
 		return err
 	}
+
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_DEL] = linkDel
 
 	// ------------------ Subscribe to New link topic --------------
@@ -247,20 +261,21 @@ func (wp *WasmcloudProvider) subToNats() error {
 			link := InterfaceLinkDefinition{}
 			err := json.Unmarshal(m.Data, &link)
 			if err != nil {
-				wp.Logger.Error("failed to decode link", err)
+				wp.Logger.Error("failed to decode link", slog.Any("error", err))
 				return
 			}
 
 			err = wp.putLink(link)
 			if err != nil {
 				// TODO(#10): handle this better?
-				wp.Logger.Error("newLinkFunc", err)
+				wp.Logger.Error("newLinkFunc", slog.Any("error", err))
 			}
 		})
 	if err != nil {
-		wp.Logger.Error("LINK_PUT", err)
+		wp.Logger.Error("LINK_PUT", slog.Any("error", err))
 		return err
 	}
+
 	wp.natsSubscriptions[wp.Topics.LATTICE_LINK_PUT] = linkPut
 
 	// ------------------ Subscribe to Shutdown topic ------------------
@@ -272,7 +287,11 @@ func (wp *WasmcloudProvider) subToNats() error {
 				log.Println("ERROR: provider shutdown function failed: " + err.Error())
 			}
 
-			m.Respond([]byte("provider shutdown handled successfully"))
+			err = m.Respond([]byte("provider shutdown handled successfully"))
+			if err != nil {
+				// NOTE: This is a log message because we don't want to stop the shutdown process
+				log.Println("ERROR: provider shutdown failed to respond: " + err.Error())
+			}
 
 			err = wp.cleanupNatsSubscriptions()
 			if err != nil {
@@ -281,10 +300,12 @@ func (wp *WasmcloudProvider) subToNats() error {
 
 			wp.cancel()
 		})
+
 	if err != nil {
-		wp.Logger.Error("LATTICE_SHUTDOWN", err)
+		wp.Logger.Error("LATTICE_SHUTDOWN", slog.Any("error", err))
 		return err
 	}
+
 	wp.natsSubscriptions[wp.Topics.LATTICE_SHUTDOWN] = shutdown
 	return nil
 }
@@ -351,6 +372,7 @@ func (wp *WasmcloudProvider) deleteLink(l InterfaceLinkDefinition) error {
 		if err != nil {
 			return err
 		}
+
 		delete(wp.targetLinks, l.SourceID)
 	} else {
 		wp.Logger.Info("received link delete that isn't for this provider, ignoring", "link", l)

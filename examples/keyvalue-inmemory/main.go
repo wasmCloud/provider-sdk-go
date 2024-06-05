@@ -20,8 +20,10 @@ func main() {
 
 func run() error {
 	p := &Provider{
-		sourceLinks: make(map[string]provider.InterfaceLinkDefinition),
-		targetLinks: make(map[string]provider.InterfaceLinkDefinition),
+		sourceLinks:       make(map[string]provider.InterfaceLinkDefinition),
+		targetLinks:       make(map[string]provider.InterfaceLinkDefinition),
+		failedSourceLinks: make(map[string]provider.InterfaceLinkDefinition),
+		failedTargetLinks: make(map[string]provider.InterfaceLinkDefinition),
 	}
 
 	wasmcloudprovider, err := provider.New(
@@ -69,12 +71,24 @@ func run() error {
 
 func (p *Provider) handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling new source link", link)
+	err := p.establishSourceLink(link)
+	if err != nil {
+		log.Println("Failed to establish source link", link, err)
+		p.failedSourceLinks[link.Target] = link
+		return err
+	}
 	p.sourceLinks[link.Target] = link
 	return nil
 }
 
 func (p *Provider) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling new target link", link)
+	err := p.establishTargetLink(link)
+	if err != nil {
+		log.Println("Failed to establish target link", link, err)
+		p.failedTargetLinks[link.SourceID] = link
+		return err
+	}
 	p.targetLinks[link.SourceID] = link
 	return nil
 }

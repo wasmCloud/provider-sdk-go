@@ -16,6 +16,8 @@ var (
 
 type Provider struct {
 	sync.Map
+	sourceLinks map[string]provider.InterfaceLinkDefinition
+	targetLinks map[string]provider.InterfaceLinkDefinition
 }
 
 func Ok[T any](v T) *wrpc.Result[T, store.Error] {

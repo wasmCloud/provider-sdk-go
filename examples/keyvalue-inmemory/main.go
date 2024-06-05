@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/wasmCloud/provider-sdk-go"
 	server "github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings"
 )
 
@@ -19,13 +18,18 @@ func main() {
 }
 
 func run() error {
-	p, err := provider.New(
-		provider.SourceLinkPut(handleNewSourceLink),
-		provider.TargetLinkPut(handleNewTargetLink),
-		provider.SourceLinkDel(handleDelSourceLink),
-		provider.TargetLinkDel(handleDelTargetLink),
-		provider.HealthCheck(handleHealthCheck),
-		provider.Shutdown(handleShutdown),
+	p := &Provider{
+		sourceLinks: make(map[string]provider.InterfaceLinkDefinition),
+		targetLinks: make(map[string]provider.InterfaceLinkDefinition),
+	}
+
+	wasmcloudprovider, err := provider.New(
+		provider.SourceLinkPut(p.handleNewSourceLink),
+		provider.TargetLinkPut(p.handleNewTargetLink),
+		provider.SourceLinkDel(p.handleDelSourceLink),
+		provider.TargetLinkDel(p.handleDelTargetLink),
+		provider.HealthCheck(p.handleHealthCheck),
+		provider.Shutdown(p.handleShutdown),
 	)
 	if err != nil {
 		return err
@@ -34,15 +38,15 @@ func run() error {
 	signalCh := make(chan os.Signal, 1)
 
 	// Handle RPC operations
-	stopFunc, err := server.Serve(p.RPCClient, &Provider{})
+	stopFunc, err := server.Serve(wasmcloudprovider.RPCClient, p)
 	if err != nil {
-		p.Shutdown()
+		wasmcloudprovider.Shutdown()
 		return err
 	}
 
 	// Handle control interface operations
 	go func() {
-		err := p.Start()
+		err := wasmcloudprovider.Start()
 		providerCh <- err
 	}()
 
@@ -54,39 +58,43 @@ func run() error {
 		stopFunc()
 		return err
 	case <-signalCh:
-		p.Shutdown()
+		wasmcloudprovider.Shutdown()
 		stopFunc()
 	}
 
 	return nil
 }
 
-func handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
+func (p *Provider) handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling new source link", link)
+	p.sourceLinks[link.Target] = link
 	return nil
 }
 
-func handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
+func (p *Provider) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling new target link", link)
+	p.targetLinks[link.SourceID] = link
 	return nil
 }
 
-func handleDelSourceLink(link provider.InterfaceLinkDefinition) error {
+func (p *Provider) handleDelSourceLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling del source link", link)
+	delete(p.sourceLinks, link.Target)
 	return nil
 }
 
-func handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
+func (p *Provider) handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
 	log.Println("Handling del target link", link)
+	delete(p.targetLinks, link.SourceID)
 	return nil
 }
 
-func handleHealthCheck() string {
+func (p *Provider) handleHealthCheck() string {
 	log.Println("Handling health check")
 	return "provider healthy"
 }
 
-func handleShutdown() error {
+func (p *Provider) handleShutdown() error {
 	log.Println("Handling shutdown")
 	return nil
 }

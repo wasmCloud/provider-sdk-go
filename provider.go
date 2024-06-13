@@ -97,8 +97,8 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	// partition links based on if the provider is the source or target
-	sourceLinks := []InterfaceLinkDefinition{}
-	targetLinks := []InterfaceLinkDefinition{}
+	var sourceLinks []InterfaceLinkDefinition
+	var targetLinks []InterfaceLinkDefinition
 
 	// Loop over the numbers
 	for _, link := range hostData.LinkDefinitions {

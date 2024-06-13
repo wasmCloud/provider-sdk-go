@@ -6,11 +6,6 @@ import (
 )
 
 func (p *Provider) establishSourceLink(link provider.InterfaceLinkDefinition) error {
-	if _, exists := p.sourceLinks[link.Target]; exists {
-		log.Println("Source link already exists, ignoring duplicate", link)
-		return nil
-	}
-
 	if err := p.validateSourceLink(link); err != nil {
 		return err
 	}
@@ -20,11 +15,6 @@ func (p *Provider) establishSourceLink(link provider.InterfaceLinkDefinition) er
 }
 
 func (p *Provider) establishTargetLink(link provider.InterfaceLinkDefinition) error {
-	if _, exists := p.targetLinks[link.SourceID]; exists {
-		log.Println("Target link already exists, ignoring duplicate", link)
-		return nil
-	}
-
 	if err := p.validateTargetLink(link); err != nil {
 		return err
 	}
@@ -40,5 +30,51 @@ func (p *Provider) validateSourceLink(link provider.InterfaceLinkDefinition) err
 
 func (p *Provider) validateTargetLink(link provider.InterfaceLinkDefinition) error {
 	// TODO: Add validation checks
+	return nil
+}
+
+func (p *Provider) handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
+	log.Println("Handling new source link", link)
+	err := p.establishSourceLink(link)
+	if err != nil {
+		log.Println("Failed to establish source link", link, err)
+		p.failedSourceLinks[link.Target] = link
+		return err
+	}
+	p.sourceLinks[link.Target] = link
+	return nil
+}
+
+func (p *Provider) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
+	log.Println("Handling new target link", link)
+	err := p.establishTargetLink(link)
+	if err != nil {
+		log.Println("Failed to establish target link", link, err)
+		p.failedTargetLinks[link.SourceID] = link
+		return err
+	}
+	p.targetLinks[link.SourceID] = link
+	return nil
+}
+
+func (p *Provider) handleDelSourceLink(link provider.InterfaceLinkDefinition) error {
+	log.Println("Handling del source link", link)
+	delete(p.sourceLinks, link.Target)
+	return nil
+}
+
+func (p *Provider) handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
+	log.Println("Handling del target link", link)
+	delete(p.targetLinks, link.SourceID)
+	return nil
+}
+
+func (p *Provider) handleHealthCheck() string {
+	log.Println("Handling health check")
+	return "provider healthy"
+}
+
+func (p *Provider) handleShutdown() error {
+	log.Println("Handling shutdown")
 	return nil
 }

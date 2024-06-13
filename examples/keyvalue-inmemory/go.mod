@@ -1,6 +1,6 @@
 module github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory
 
-go 1.20
+go 1.22.3
 
 require (
 	github.com/wasmCloud/provider-sdk-go v0.0.0-20240124183610-1a92f8d04935

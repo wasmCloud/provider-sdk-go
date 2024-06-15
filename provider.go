@@ -336,19 +336,35 @@ func (wp *WasmcloudProvider) cleanupNatsSubscriptions() error {
 }
 
 func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {
+	// Ignore duplicate links
+	if wp.isLinked(l.SourceID, l.Target) {
+		wp.Logger.Info("ignoring duplicate link", "link", l)
+		return nil
+	}
+
+	wp.lock.Lock()
+	defer wp.lock.Unlock()
+
 	if l.SourceID == wp.Id {
 		return wp.putSourceLinkFunc(l)
 	} else if l.Target == wp.Id {
 		return wp.putTargetLinkFunc(l)
+	} else {
+		wp.Logger.Info("received link that isn't for this provider, ignoring", "link", l)
 	}
+
 	return nil
 }
 
 func (wp *WasmcloudProvider) deleteLink(l InterfaceLinkDefinition) error {
+	wp.lock.Lock()
+	defer wp.lock.Unlock()
 	if l.SourceID == wp.Id {
 		return wp.delSourceLinkFunc(l)
 	} else if l.Target == wp.Id {
 		return wp.delTargetLinkFunc(l)
+	} else {
+		wp.Logger.Info("received link delete that isn't for this provider, ignoring", "link", l)
 	}
 	return nil
 }

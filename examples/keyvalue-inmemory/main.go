@@ -1,5 +1,3 @@
-//go:generate wit-bindgen-wrpc go --out-dir bindings --package github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings wit
-
 package main
 
 import (

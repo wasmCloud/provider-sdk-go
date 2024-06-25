@@ -144,28 +144,12 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		sourceLinks: make(map[string]InterfaceLinkDefinition, len(sourceLinks)),
 		targetLinks: make(map[string]InterfaceLinkDefinition, len(targetLinks)),
 	}
-
 	for _, opt := range options {
 		err := opt(provider)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	for _, link := range sourceLinks {
-		err := provider.putLink(link)
-		if err != nil {
-			logger.Error("failed to put source link", slog.Any("error", err))
-		}
-	}
-
-	for _, link := range targetLinks {
-		err := provider.putLink(link)
-		if err != nil {
-			logger.Error("failed to put target link", slog.Any("error", err))
-		}
-	}
-
 	return provider, nil
 }
 
@@ -182,6 +166,20 @@ func (wp *WasmcloudProvider) OutgoingRpcClient(target string) *wrpcnats.Client {
 }
 
 func (wp *WasmcloudProvider) Start() error {
+	// update link events
+	for _, link := range wp.sourceLinks {
+		err := wp.putLink(link)
+		if err != nil {
+			wp.Logger.Error("failed to put source link", slog.Any("error", err))
+		}
+	}
+
+	for _, link := range wp.targetLinks {
+		err := wp.putLink(link)
+		if err != nil {
+			wp.Logger.Error("failed to put target link", slog.Any("error", err))
+		}
+	}
 	err := wp.subToNats()
 	if err != nil {
 		return err

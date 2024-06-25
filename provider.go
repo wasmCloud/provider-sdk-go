@@ -150,6 +150,20 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 			return nil, err
 		}
 	}
+	for _, link := range sourceLinks {
+		err := provider.putLink(link)
+		if err != nil {
+			logger.Error("failed to put source link", slog.Any("error", err))
+		}
+	}
+
+	for _, link := range targetLinks {
+		err := provider.putLink(link)
+		if err != nil {
+			logger.Error("failed to put target link", slog.Any("error", err))
+		}
+	}
+
 	return provider, nil
 }
 
@@ -168,16 +182,16 @@ func (wp *WasmcloudProvider) OutgoingRpcClient(target string) *wrpcnats.Client {
 func (wp *WasmcloudProvider) Start() error {
 	// update link events
 	for _, link := range wp.sourceLinks {
-		err := wp.putLink(link)
+		err := wp.putSourceLinkFunc(link)
 		if err != nil {
-			wp.Logger.Error("failed to put source link", slog.Any("error", err))
+			wp.Logger.Error("failed to execute callback for source link", slog.Any("error", err))
 		}
 	}
 
 	for _, link := range wp.targetLinks {
-		err := wp.putLink(link)
+		err := wp.putTargetLinkFunc(link)
 		if err != nil {
-			wp.Logger.Error("failed to put target link", slog.Any("error", err))
+			wp.Logger.Error("failed to execute callback for target link", slog.Any("error", err))
 		}
 	}
 	err := wp.subToNats()
@@ -343,18 +357,8 @@ func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
 	if l.SourceID == wp.Id {
-		err := wp.putSourceLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
 		wp.sourceLinks[l.Target] = l
 	} else if l.Target == wp.Id {
-		err := wp.putTargetLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
 		wp.targetLinks[l.SourceID] = l
 	} else {
 		wp.Logger.Info("received link that isn't for this provider, ignoring", "link", l)

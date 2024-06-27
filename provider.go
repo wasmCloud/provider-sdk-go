@@ -97,8 +97,8 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	// partition links based on if the provider is the source or target
-	sourceLinks := []InterfaceLinkDefinition{}
-	targetLinks := []InterfaceLinkDefinition{}
+	var sourceLinks []InterfaceLinkDefinition
+	var targetLinks []InterfaceLinkDefinition
 
 	// Loop over the numbers
 	for _, link := range hostData.LinkDefinitions {
@@ -356,20 +356,11 @@ func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {
 
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
+
 	if l.SourceID == wp.Id {
-		err := wp.putSourceLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
-		wp.sourceLinks[l.Target] = l
+		return wp.putSourceLinkFunc(l)
 	} else if l.Target == wp.Id {
-		err := wp.putTargetLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
-		wp.targetLinks[l.SourceID] = l
+		return wp.putTargetLinkFunc(l)
 	} else {
 		wp.Logger.Info("received link that isn't for this provider, ignoring", "link", l)
 	}
@@ -398,23 +389,12 @@ func (wp *WasmcloudProvider) deleteLink(l InterfaceLinkDefinition) error {
 	wp.lock.Lock()
 	defer wp.lock.Unlock()
 	if l.SourceID == wp.Id {
-		err := wp.delSourceLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
-		delete(wp.sourceLinks, l.Target)
+		return wp.delSourceLinkFunc(l)
 	} else if l.Target == wp.Id {
-		err := wp.delTargetLinkFunc(l)
-		if err != nil {
-			return err
-		}
-
-		delete(wp.targetLinks, l.SourceID)
+		return wp.delTargetLinkFunc(l)
 	} else {
 		wp.Logger.Info("received link delete that isn't for this provider, ignoring", "link", l)
 	}
-
 	return nil
 }
 

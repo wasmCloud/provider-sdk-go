@@ -1,5 +1,3 @@
-//go:generate wit-bindgen-wrpc go --out-dir bindings --package github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings wit
-
 package main
 
 import (
@@ -20,8 +18,10 @@ func main() {
 
 func run() error {
 	p := &Provider{
-		sourceLinks: make(map[string]provider.InterfaceLinkDefinition),
-		targetLinks: make(map[string]provider.InterfaceLinkDefinition),
+		sourceLinks:       make(map[string]provider.InterfaceLinkDefinition),
+		targetLinks:       make(map[string]provider.InterfaceLinkDefinition),
+		failedSourceLinks: make(map[string]provider.InterfaceLinkDefinition),
+		failedTargetLinks: make(map[string]provider.InterfaceLinkDefinition),
 	}
 
 	wasmcloudprovider, err := provider.New(
@@ -64,39 +64,5 @@ func run() error {
 		stopFunc()
 	}
 
-	return nil
-}
-
-func (p *Provider) handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
-	log.Println("Handling new source link", link)
-	p.sourceLinks[link.Target] = link
-	return nil
-}
-
-func (p *Provider) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
-	log.Println("Handling new target link", link)
-	p.targetLinks[link.SourceID] = link
-	return nil
-}
-
-func (p *Provider) handleDelSourceLink(link provider.InterfaceLinkDefinition) error {
-	log.Println("Handling del source link", link)
-	delete(p.sourceLinks, link.Target)
-	return nil
-}
-
-func (p *Provider) handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
-	log.Println("Handling del target link", link)
-	delete(p.targetLinks, link.SourceID)
-	return nil
-}
-
-func (p *Provider) handleHealthCheck() string {
-	log.Println("Handling health check")
-	return "provider healthy"
-}
-
-func (p *Provider) handleShutdown() error {
-	log.Println("Handling shutdown")
 	return nil
 }

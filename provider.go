@@ -15,6 +15,7 @@ import (
 	"time"
 
 	nats "github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	wrpcnats "github.com/wrpc/wrpc/go/nats"
 )
 
@@ -25,8 +26,11 @@ type WasmcloudProvider struct {
 	cancel  context.CancelFunc
 	Logger  *slog.Logger
 
-	hostData HostData
-	Topics   Topics
+	hostData     HostData
+	hostXkey     nkeys.KeyPair
+	providerXkey nkeys.KeyPair
+
+	Topics Topics
 
 	RPCClient *wrpcnats.Client
 
@@ -84,10 +88,16 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 
 	// Initialize Logging
 	var logger *slog.Logger
-	if hostData.StructuredLogging {
-		logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: hostData.LogLevel}))
+	var level Level
+	if hostData.LogLevel != nil {
+		level = *hostData.LogLevel
 	} else {
-		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: hostData.LogLevel}))
+		level = Info
+	}
+	if hostData.StructuredLogging {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	}
 
 	// Connect to NATS
@@ -96,9 +106,43 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		return nil, err
 	}
 
+	logger.Debug("host config", "config", hostData)
+
+	var hostXkey nkeys.KeyPair
+	if len(hostData.HostXKeyPublicKey) == 0 {
+		// If the host xkey is not provided, secrets won't be sent to the provider
+		// so we can just create a new xkey
+		hostXkey, err = nkeys.CreateCurveKeys()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		hostXkey, err = nkeys.FromPublicKey(hostData.HostXKeyPublicKey)
+		if err != nil {
+			logger.Error("failed to create host xkey from public key", slog.Any("error", err))
+			return nil, err
+		}
+	}
+
+	var providerXkey nkeys.KeyPair
+	if len(hostData.ProviderXKeyPrivateKey) == 0 {
+		// If the provider xkey is not provided, secrets won't be sent to the provider
+		// so we can just create a new xkey
+		providerXkey, err = nkeys.CreateCurveKeys()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		providerXkey, err = nkeys.FromCurveSeed([]byte(hostData.ProviderXKeyPrivateKey))
+		if err != nil {
+			logger.Error("failed to create provider xkey from private key", slog.Any("error", err))
+			return nil, err
+		}
+	}
+
 	// partition links based on if the provider is the source or target
-	sourceLinks := []InterfaceLinkDefinition{}
-	targetLinks := []InterfaceLinkDefinition{}
+	sourceLinks := []linkWithEncryptedSecrets{}
+	targetLinks := []linkWithEncryptedSecrets{}
 
 	// Loop over the numbers
 	for _, link := range hostData.LinkDefinitions {
@@ -121,12 +165,14 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		Id:        hostData.ProviderKey,
 		Logger:    logger,
 		RPCClient: wrpc,
-		Topics:    LatticeTopics(hostData),
+		Topics:    LatticeTopics(hostData, providerXkey),
 
 		context: ctx,
 		cancel:  cancel,
 
-		hostData: hostData,
+		hostData:     hostData,
+		hostXkey:     hostXkey,
+		providerXkey: providerXkey,
 
 		natsConnection:    nc,
 		natsSubscriptions: map[string]*nats.Subscription{},
@@ -153,14 +199,22 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	for _, link := range sourceLinks {
-		err := provider.updateProviderLinkMap(link)
+		decryptedLink, err := provider.DecryptLinkSecrets(link)
+		if err != nil {
+			logger.Error("failed to decrypt secrets on link", slog.Any("error", err))
+		}
+		err = provider.updateProviderLinkMap(decryptedLink)
 		if err != nil {
 			logger.Error("failed to update provider link map", slog.Any("error", err))
 		}
 	}
 
 	for _, link := range targetLinks {
-		err := provider.updateProviderLinkMap(link)
+		decryptedLink, err := provider.DecryptLinkSecrets(link)
+		if err != nil {
+			logger.Error("failed to decrypt secrets on link", slog.Any("error", err))
+		}
+		err = provider.updateProviderLinkMap(decryptedLink)
 		if err != nil {
 			logger.Error("failed to update provider link map", slog.Any("error", err))
 		}
@@ -278,14 +332,20 @@ func (wp *WasmcloudProvider) subToNats() error {
 	// ------------------ Subscribe to New link topic --------------
 	linkPut, err := wp.natsConnection.Subscribe(wp.Topics.LATTICE_LINK_PUT,
 		func(m *nats.Msg) {
-			link := InterfaceLinkDefinition{}
+			link := linkWithEncryptedSecrets{}
 			err := json.Unmarshal(m.Data, &link)
 			if err != nil {
 				wp.Logger.Error("failed to decode link", slog.Any("error", err))
 				return
 			}
 
-			err = wp.putLink(link)
+			providerLink, err := wp.DecryptLinkSecrets(link)
+			if err != nil {
+				wp.Logger.Error("failed to decrypt secrets on link", slog.Any("error", err))
+				return
+			}
+
+			err = wp.putLink(providerLink)
 			if err != nil {
 				// TODO(#10): handle this better?
 				wp.Logger.Error("newLinkFunc", slog.Any("error", err))
@@ -304,18 +364,18 @@ func (wp *WasmcloudProvider) subToNats() error {
 			err := wp.shutdownFunc()
 			if err != nil {
 				// TODO(#10): handle this better?
-				log.Println("ERROR: provider shutdown function failed: " + err.Error())
+				wp.Logger.Error("ERROR: provider shutdown function failed: " + err.Error())
 			}
 
 			err = m.Respond([]byte("provider shutdown handled successfully"))
 			if err != nil {
 				// NOTE: This is a log message because we don't want to stop the shutdown process
-				log.Println("ERROR: provider shutdown failed to respond: " + err.Error())
+				wp.Logger.Error("ERROR: provider shutdown failed to respond: " + err.Error())
 			}
 
 			err = wp.cleanupNatsSubscriptions()
 			if err != nil {
-				log.Println("ERROR: provider shutdown failed to drain connection: " + err.Error())
+				wp.Logger.Error("ERROR: provider shutdown failed to drain connection: " + err.Error())
 			}
 
 			wp.cancel()
@@ -340,11 +400,36 @@ func (wp *WasmcloudProvider) cleanupNatsSubscriptions() error {
 		err := s.Drain()
 		if err != nil {
 			// NOTE: This is a log message because we don't want to stop the shutdown process
-			log.Println("ERROR: provider shutdown failed to drain subscription: " + err.Error())
+			wp.Logger.Error("ERROR: provider shutdown failed to drain subscription: " + err.Error())
 		}
 	}
 
 	return wp.natsConnection.Drain()
+}
+
+func (wp *WasmcloudProvider) DecryptLinkSecrets(h linkWithEncryptedSecrets) (InterfaceLinkDefinition, error) {
+	sourceSecrets, err := DecryptSecrets(h.SourceSecrets, wp.providerXkey, wp.hostData.HostXKeyPublicKey)
+	if err != nil {
+		return InterfaceLinkDefinition{}, err
+	}
+
+	targetSecrets, err := DecryptSecrets(h.TargetSecrets, wp.providerXkey, wp.hostData.HostXKeyPublicKey)
+	if err != nil {
+		return InterfaceLinkDefinition{}, err
+	}
+
+	return InterfaceLinkDefinition{
+		SourceID:      h.SourceID,
+		Target:        h.Target,
+		Name:          h.Name,
+		WitNamespace:  h.WitNamespace,
+		WitPackage:    h.WitPackage,
+		Interfaces:    h.Interfaces,
+		SourceConfig:  h.SourceConfig,
+		TargetConfig:  h.TargetConfig,
+		SourceSecrets: sourceSecrets,
+		TargetSecrets: targetSecrets,
+	}, nil
 }
 
 func (wp *WasmcloudProvider) putLink(l InterfaceLinkDefinition) error {

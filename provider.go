@@ -85,9 +85,9 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	// Initialize Logging
 	var logger *slog.Logger
 	if hostData.StructuredLogging {
-		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: hostData.LogLevel}))
 	} else {
-		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: hostData.LogLevel}))
 	}
 
 	// Connect to NATS

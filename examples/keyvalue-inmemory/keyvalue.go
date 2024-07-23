@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	errNoSuchStore     = store.NewError_NoSuchStore()
-	errInvalidDataType = store.NewError_Other("invalid data type stored in map")
+	errNoSuchStore     = store.NewErrorNoSuchStore()
+	errInvalidDataType = store.NewErrorOther("invalid data type stored in map")
 )
 
 type Provider struct {
@@ -86,7 +86,7 @@ func (p *Provider) Set(ctx context.Context, bucket string, key string, value []b
 
 func (p *Provider) ListKeys(ctx context.Context, bucket string, cursor *uint64) (*wrpc.Result[store.KeyResponse, store.Error], error) {
 	if cursor != nil {
-		return wrpc.Err[store.KeyResponse](*store.NewError_Other("cursors are not supported")), nil
+		return wrpc.Err[store.KeyResponse](*store.NewErrorOther("cursors are not supported")), nil
 	}
 	b := &sync.Map{}
 	v, ok := p.LoadOrStore(bucket, b)

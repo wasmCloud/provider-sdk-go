@@ -7,29 +7,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-// Type alias to use for sensitive string values
-// to avoid accidentally logging them
-// type SensitiveString string
-
-// func (s SensitiveString) String() string {
-// 	return "**redacted(string)"
-// }
-
-// func (s SensitiveString) Reveal() string {
-// 	return string(s)
-// }
-
-// // Type alias to use for sensitive []byte values
-// // to avoid accidentally logging them
-// type SensitiveBytes []byte
-
-// func (s SensitiveBytes) String() string {
-// 	return "**redacted(bytes)"
-// }
-
-// func (s SensitiveBytes) Reveal() []byte {
-// 	return s
-// }
+// Type alias to use for sensitive values to avoid accidentally logging them
 
 type SecretStringValue struct {
 	value string
@@ -78,6 +56,16 @@ func (s *SecretValue) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid secret kind: %s", jsonSecret["kind"])
 	}
 
+	return nil
+}
+
+func (s *SecretStringValue) UnmarshalJSON(data []byte) error {
+	var stringValue string
+	err := json.Unmarshal(data, &stringValue)
+	if err != nil {
+		return err
+	}
+	s.value = stringValue
 	return nil
 }
 

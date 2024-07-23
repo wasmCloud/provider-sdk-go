@@ -26,7 +26,7 @@ type HostData struct {
 	Config                 map[string]string          `json:"config,omitempty"`
 	Secrets                map[string]SecretValue     `json:"secrets,omitempty"`
 	HostXKeyPublicKey      string                     `json:"host_xkey_public_key,omitempty"`
-	ProviderXKeyPrivateKey string                     `json:"provider_xkey_private_key,omitempty"`
+	ProviderXKeyPrivateKey SecretStringValue          `json:"provider_xkey_private_key,omitempty"`
 	DefaultRPCTimeoutMS    *uint64                    `json:"default_rpc_timeout_ms,omitempty"`
 	StructuredLogging      bool                       `json:"structured_logging,omitempty"`
 	LogLevel               *Level                     `json:"log_level,omitempty"`

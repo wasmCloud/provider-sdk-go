@@ -17,6 +17,8 @@ import (
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	wrpcnats "github.com/wrpc/wrpc/go/nats"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/log/global"
 )
 
 type WasmcloudProvider struct {
@@ -39,8 +41,9 @@ type WasmcloudProvider struct {
 
 	healthMsgFunc func() string
 
-	shutdownFunc func() error
-	shutdown     chan struct{}
+	shutdownFunc          func() error
+	internalShutdownFuncs []func(context.Context) error
+	shutdown              chan struct{}
 
 	putSourceLinkFunc func(InterfaceLinkDefinition) error
 	putTargetLinkFunc func(InterfaceLinkDefinition) error
@@ -98,6 +101,39 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		logger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	} else {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	}
+
+	var internalShutdownFuncs []func(context.Context) error
+
+	// Initialize Observability
+	propagator := newPropagator()
+	otel.SetTextMapPropagator(propagator)
+
+	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableMetrics != nil && *hostData.OtelConfig.EnableMetrics) {
+		meterProvider, err := newMeterProvider(context.Background(), hostData.OtelConfig)
+		if err != nil {
+			return nil, err
+		}
+		otel.SetMeterProvider(meterProvider)
+		internalShutdownFuncs = append(internalShutdownFuncs, func(c context.Context) error { return meterProvider.Shutdown(c) })
+	}
+
+	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableTraces != nil && *hostData.OtelConfig.EnableTraces) {
+		tracerProvider, err := newTracerProvider(context.Background(), hostData.OtelConfig)
+		if err != nil {
+			return nil, err
+		}
+		otel.SetTracerProvider(tracerProvider)
+		internalShutdownFuncs = append(internalShutdownFuncs, func(c context.Context) error { return tracerProvider.Shutdown(c) })
+	}
+
+	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableLogs != nil && *hostData.OtelConfig.EnableLogs) {
+		loggerProvider, err := newLoggerProvider(context.Background(), hostData.OtelConfig)
+		if err != nil {
+			return nil, err
+		}
+		global.SetLoggerProvider(loggerProvider)
+		internalShutdownFuncs = append(internalShutdownFuncs, func(c context.Context) error { return loggerProvider.Shutdown(c) })
 	}
 
 	// Connect to NATS
@@ -179,8 +215,9 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 
 		healthMsgFunc: func() string { return "healthy" },
 
-		shutdownFunc: func() error { return nil },
-		shutdown:     make(chan struct{}),
+		shutdownFunc:          func() error { return nil },
+		internalShutdownFuncs: internalShutdownFuncs,
+		shutdown:              make(chan struct{}),
 
 		putSourceLinkFunc: func(InterfaceLinkDefinition) error { return nil },
 		putTargetLinkFunc: func(InterfaceLinkDefinition) error { return nil },
@@ -272,6 +309,13 @@ func (wp *WasmcloudProvider) Shutdown() error {
 		return err
 	}
 
+	for _, errFunc := range wp.internalShutdownFuncs {
+		if err := errFunc(wp.context); err != nil {
+			wp.cancel()
+			return err
+		}
+	}
+
 	wp.cancel()
 	return nil
 }
@@ -297,7 +341,6 @@ func (wp *WasmcloudProvider) subToNats() error {
 				wp.Logger.Error("failed to publish health check response", slog.Any("error", err))
 			}
 		})
-
 	if err != nil {
 		wp.Logger.Error("LATTICE_HEALTH", slog.Any("error", err))
 		return err
@@ -380,7 +423,6 @@ func (wp *WasmcloudProvider) subToNats() error {
 
 			wp.cancel()
 		})
-
 	if err != nil {
 		wp.Logger.Error("LATTICE_SHUTDOWN", slog.Any("error", err))
 		return err

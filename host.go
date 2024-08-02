@@ -1,5 +1,10 @@
 package provider
 
+const (
+	OtelProtocolHTTP = "http"
+	OtelProtocolGRPC = "grpc"
+)
+
 type OtelConfig struct {
 	EnableObservability   bool   `json:"enable_observability"`
 	EnableTraces          *bool  `json:"enable_traces,omitempty"`
@@ -10,6 +15,7 @@ type OtelConfig struct {
 	MetricsEndpoint       string `json:"metrics_endpoint,omitempty"`
 	LogsEndpoint          string `json:"logs_endpoint,omitempty"`
 	TraceLevel            *Level `json:"trace_level,omitempty"`
+	Protocol              string `json:"protocol,omitempty"`
 }
 
 type HostData struct {

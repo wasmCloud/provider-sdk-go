@@ -10,6 +10,7 @@ import (
 
 	"github.com/wasmCloud/provider-sdk-go"
 	server "github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func run() error {
 	p := &Provider{
 		sourceLinks: make(map[string]provider.InterfaceLinkDefinition),
 		targetLinks: make(map[string]provider.InterfaceLinkDefinition),
+		tracer:      otel.Tracer("keyvalue-inmemory"),
 	}
 
 	wasmcloudprovider, err := provider.New(

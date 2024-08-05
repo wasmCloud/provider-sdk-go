@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -14,7 +16,9 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 const (
@@ -23,12 +27,6 @@ const (
 	OtelLogExportInterval    = 10 * time.Second
 )
 
-func InitializeObservability() {
-}
-
-func PropagateTraceForContext() {
-}
-
 func newPropagator() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
@@ -36,7 +34,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTracerProvider(ctx context.Context, config OtelConfig) (*trace.TracerProvider, error) {
+func newTracerProvider(ctx context.Context, config OtelConfig, serviceResource *resource.Resource) (*trace.TracerProvider, error) {
 	var exporter trace.SpanExporter
 	var err error
 
@@ -63,6 +61,7 @@ func newTracerProvider(ctx context.Context, config OtelConfig) (*trace.TracerPro
 	}
 
 	traceProvider := trace.NewTracerProvider(
+		trace.WithResource(serviceResource),
 		trace.WithBatcher(exporter,
 			trace.WithBatchTimeout(OtelTraceExportInterval),
 		),
@@ -73,7 +72,7 @@ func newTracerProvider(ctx context.Context, config OtelConfig) (*trace.TracerPro
 	return traceProvider, nil
 }
 
-func newMeterProvider(ctx context.Context, config OtelConfig) (*metric.MeterProvider, error) {
+func newMeterProvider(ctx context.Context, config OtelConfig, serviceResource *resource.Resource) (*metric.MeterProvider, error) {
 	var exporter metric.Exporter
 	var err error
 
@@ -95,6 +94,7 @@ func newMeterProvider(ctx context.Context, config OtelConfig) (*metric.MeterProv
 	}
 
 	meterProvider := metric.NewMeterProvider(
+		metric.WithResource(serviceResource),
 		metric.WithReader(metric.NewPeriodicReader(exporter,
 			metric.WithInterval(OtelMetricExportInterval))),
 	)
@@ -102,7 +102,7 @@ func newMeterProvider(ctx context.Context, config OtelConfig) (*metric.MeterProv
 	return meterProvider, nil
 }
 
-func newLoggerProvider(ctx context.Context, config OtelConfig) (*log.LoggerProvider, error) {
+func newLoggerProvider(ctx context.Context, config OtelConfig, serviceResource *resource.Resource) (*log.LoggerProvider, error) {
 	var exporter log.Exporter
 	var err error
 
@@ -124,9 +124,25 @@ func newLoggerProvider(ctx context.Context, config OtelConfig) (*log.LoggerProvi
 	}
 
 	loggerProvider := log.NewLoggerProvider(
+		log.WithResource(serviceResource),
 		log.WithProcessor(log.NewBatchProcessor(exporter,
 			log.WithExportInterval(OtelLogExportInterval))),
 	)
 
 	return loggerProvider, nil
+}
+
+func newServiceResource(ctx context.Context, name string) (*resource.Resource, error) {
+	providerBinary, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	serviceName := semconv.ServiceNameKey.String(filepath.Base(providerBinary))
+	providerName := semconv.ServiceInstanceIDKey.String(name)
+	return resource.New(ctx,
+		resource.WithAttributes(
+			serviceName,
+			providerName,
+		),
+	)
 }

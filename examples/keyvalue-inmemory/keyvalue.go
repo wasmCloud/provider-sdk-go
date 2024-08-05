@@ -3,11 +3,13 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/wasmCloud/provider-sdk-go"
 	"github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings/exports/wrpc/keyvalue/store"
 	wrpc "github.com/wrpc/wrpc/go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -19,6 +21,8 @@ type Provider struct {
 	sync.Map
 	sourceLinks map[string]provider.InterfaceLinkDefinition
 	targetLinks map[string]provider.InterfaceLinkDefinition
+	tracer      trace.Tracer
+	logger      log.Logger
 }
 
 func Ok[T any](v T) *wrpc.Result[T, store.Error] {
@@ -26,6 +30,9 @@ func Ok[T any](v T) *wrpc.Result[T, store.Error] {
 }
 
 func (p *Provider) Delete(ctx context.Context, bucket string, key string) (*wrpc.Result[struct{}, store.Error], error) {
+	ctx, span := p.tracer.Start(ctx, "Delete")
+	defer span.End()
+
 	v, ok := p.Load(bucket)
 	if !ok {
 		return wrpc.Err[struct{}](*errNoSuchStore), nil
@@ -39,6 +46,9 @@ func (p *Provider) Delete(ctx context.Context, bucket string, key string) (*wrpc
 }
 
 func (p *Provider) Exists(ctx context.Context, bucket string, key string) (*wrpc.Result[bool, store.Error], error) {
+	ctx, span := p.tracer.Start(ctx, "Exists")
+	defer span.End()
+
 	v, ok := p.Load(bucket)
 	if !ok {
 		return wrpc.Err[bool](*errNoSuchStore), nil
@@ -52,6 +62,9 @@ func (p *Provider) Exists(ctx context.Context, bucket string, key string) (*wrpc
 }
 
 func (p *Provider) Get(ctx context.Context, bucket string, key string) (*wrpc.Result[[]uint8, store.Error], error) {
+	ctx, span := p.tracer.Start(ctx, "Get")
+	defer span.End()
+
 	v, ok := p.Load(bucket)
 	if !ok {
 		return wrpc.Err[[]uint8](*errNoSuchStore), nil
@@ -72,6 +85,9 @@ func (p *Provider) Get(ctx context.Context, bucket string, key string) (*wrpc.Re
 }
 
 func (p *Provider) Set(ctx context.Context, bucket string, key string, value []byte) (*wrpc.Result[struct{}, store.Error], error) {
+	ctx, span := p.tracer.Start(ctx, "Set")
+	defer span.End()
+
 	b := &sync.Map{}
 	v, ok := p.LoadOrStore(bucket, b)
 	if ok {
@@ -85,6 +101,9 @@ func (p *Provider) Set(ctx context.Context, bucket string, key string, value []b
 }
 
 func (p *Provider) ListKeys(ctx context.Context, bucket string, cursor *uint64) (*wrpc.Result[store.KeyResponse, store.Error], error) {
+	ctx, span := p.tracer.Start(ctx, "ListKeys")
+	defer span.End()
+
 	if cursor != nil {
 		return wrpc.Err[store.KeyResponse](*store.NewErrorOther("cursors are not supported")), nil
 	}

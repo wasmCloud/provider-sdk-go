@@ -109,8 +109,13 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	propagator := newPropagator()
 	otel.SetTextMapPropagator(propagator)
 
+	serviceResource, err := newServiceResource(context.Background(), hostData.ProviderKey)
+	if err != nil {
+		return nil, err
+	}
+
 	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableMetrics != nil && *hostData.OtelConfig.EnableMetrics) {
-		meterProvider, err := newMeterProvider(context.Background(), hostData.OtelConfig)
+		meterProvider, err := newMeterProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +124,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableTraces != nil && *hostData.OtelConfig.EnableTraces) {
-		tracerProvider, err := newTracerProvider(context.Background(), hostData.OtelConfig)
+		tracerProvider, err := newTracerProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +133,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableLogs != nil && *hostData.OtelConfig.EnableLogs) {
-		loggerProvider, err := newLoggerProvider(context.Background(), hostData.OtelConfig)
+		loggerProvider, err := newLoggerProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err
 		}

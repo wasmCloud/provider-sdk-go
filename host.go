@@ -1,8 +1,8 @@
 package provider
 
 const (
-	OtelProtocolHTTP = "http"
-	OtelProtocolGRPC = "grpc"
+	OtelProtocolHTTP = "Http"
+	OtelProtocolGRPC = "Grpc"
 )
 
 type OtelConfig struct {

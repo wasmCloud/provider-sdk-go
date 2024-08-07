@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/wasmCloud/provider-sdk-go"
@@ -22,7 +21,6 @@ type Provider struct {
 	sourceLinks map[string]provider.InterfaceLinkDefinition
 	targetLinks map[string]provider.InterfaceLinkDefinition
 	tracer      trace.Tracer
-	logger      log.Logger
 }
 
 func Ok[T any](v T) *wrpc.Result[T, store.Error] {

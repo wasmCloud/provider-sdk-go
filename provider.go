@@ -41,7 +41,9 @@ type WasmcloudProvider struct {
 
 	healthMsgFunc func() string
 
-	shutdownFunc          func() error
+	shutdownFunc func() error
+	// internalShutdownFuncs holds a list of callbacks triggered during shutdown (ex: opentelemetry exporter graceful shutdown).
+	// They are called after the user provided `shutdownFunc` and nats disconnect.
 	internalShutdownFuncs []func(context.Context) error
 	shutdown              chan struct{}
 

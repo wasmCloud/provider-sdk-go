@@ -198,7 +198,8 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		}
 	}
 
-	wrpc := wrpcnats.NewClient(nc, fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey))
+	prefix := fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey)
+	wrpc := wrpcnats.NewClientWithQueueGroup(nc, prefix, prefix)
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT)

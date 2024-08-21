@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
+	wrpcnats "github.com/bytecodealliance/wrpc/go/nats"
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	wrpcnats "github.com/wrpc/wrpc/go/nats"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log/global"
 )

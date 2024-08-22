@@ -3,8 +3,10 @@ module github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory
 go 1.22.3
 
 require (
+	github.com/bytecodealliance/wrpc/go v0.0.0-20240821200644-5f4408308a27
 	github.com/wasmCloud/provider-sdk-go v0.0.0-20240124183610-1a92f8d04935
-	github.com/wrpc/wrpc/go v0.0.0-20240723002736-26b614676513
+	go.opentelemetry.io/otel v1.28.0
+	go.opentelemetry.io/otel/trace v1.28.0
 )
 
 require (
@@ -14,10 +16,9 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.21.0 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
-	github.com/nats-io/nats.go v1.36.0 // indirect
+	github.com/nats-io/nats.go v1.37.0 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240801233905-f7977e064c9c // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.4.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.28.0 // indirect
@@ -30,7 +31,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.4.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/net v0.27.0 // indirect

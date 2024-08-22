@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
+	wrpcnats "github.com/bytecodealliance/wrpc/go/nats"
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	wrpcnats "github.com/wrpc/wrpc/go/nats"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log/global"
 )
@@ -198,7 +198,8 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 		}
 	}
 
-	wrpc := wrpcnats.NewClient(nc, fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey))
+	prefix := fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey)
+	wrpc := wrpcnats.NewClientWithQueueGroup(nc, prefix, prefix)
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT)

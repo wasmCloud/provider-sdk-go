@@ -4,9 +4,9 @@ go 1.22.3
 
 require (
 	github.com/bytecodealliance/wrpc/go v0.0.0-20240821200644-5f4408308a27
-	github.com/wasmCloud/provider-sdk-go v0.0.0-20240124183610-1a92f8d04935
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/trace v1.28.0
+	go.wasmcloud.dev/provider v0.0.0-20240124183610-1a92f8d04935
 )
 
 require (
@@ -42,4 +42,4 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace github.com/wasmCloud/provider-sdk-go => ../..
+replace go.wasmcloud.dev/provider => ../..

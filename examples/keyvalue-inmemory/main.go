@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/wasmCloud/provider-sdk-go"
 	server "github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings"
 	"go.opentelemetry.io/otel"
+	"go.wasmcloud.dev/provider"
 )
 
 func main() {

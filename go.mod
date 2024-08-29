@@ -1,4 +1,4 @@
-module github.com/wasmCloud/provider-sdk-go
+module go.wasmcloud.dev/provider
 
 go 1.22.2
 

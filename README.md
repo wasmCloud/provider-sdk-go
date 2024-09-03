@@ -1,6 +1,6 @@
 # wasmCloud Provider SDK
 
-Providers are swappable [wasmCloud](https://wasmcloud) host plugins. They are executables (usually dedicated to longer-lived processes) that deliver common functionalities called capabilities. Providers are typically responsible for [capabilities](https://wasmcloud.com/docs/concepts/capabilities) that are not considered part of the core business logic of an application, such as...
+Providers are swappable [wasmCloud](https://wasmcloud.com) host plugins. They are executables (usually dedicated to longer-lived processes) that deliver common functionalities called capabilities. Providers are typically responsible for [capabilities](https://wasmcloud.com/docs/concepts/capabilities) that are not considered part of the core business logic of an application, such as...
 
 - Sending notifications
 - Fetching secret values

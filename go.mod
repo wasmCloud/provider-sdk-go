@@ -5,7 +5,6 @@ go 1.22.2
 toolchain go1.22.3
 
 require (
-	github.com/bytecodealliance/wrpc/go v0.0.0-20240821200644-5f4408308a27
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
 	go.opentelemetry.io/otel v1.28.0
@@ -19,6 +18,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0
 	go.opentelemetry.io/otel/sdk/log v0.4.0
 	go.opentelemetry.io/otel/sdk/metric v1.28.0
+	wrpc.io/go v0.0.3
 )
 
 require (

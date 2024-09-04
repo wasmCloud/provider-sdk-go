@@ -5,10 +5,10 @@ import (
 	"context"
 	"sync"
 
-	wrpc "github.com/bytecodealliance/wrpc/go"
 	"github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings/exports/wrpc/keyvalue/store"
 	"go.opentelemetry.io/otel/trace"
 	"go.wasmcloud.dev/provider"
+	wrpc "wrpc.io/go"
 )
 
 var (

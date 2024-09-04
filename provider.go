@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	wrpcnats "github.com/bytecodealliance/wrpc/go/nats"
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log/global"
+	wrpcnats "wrpc.io/go/nats"
 )
 
 type WasmcloudProvider struct {
@@ -199,7 +199,7 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	prefix := fmt.Sprintf("%s.%s", hostData.LatticeRPCPrefix, hostData.ProviderKey)
-	wrpc := wrpcnats.NewClientWithQueueGroup(nc, prefix, prefix)
+	wrpc := wrpcnats.NewClient(nc, wrpcnats.WithPrefix(prefix), wrpcnats.WithGroup(prefix))
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT)
@@ -276,7 +276,7 @@ func (wp *WasmcloudProvider) NatsConnection() *nats.Conn {
 }
 
 func (wp *WasmcloudProvider) OutgoingRpcClient(target string) *wrpcnats.Client {
-	return wrpcnats.NewClient(wp.natsConnection, fmt.Sprintf("%s.%s", wp.hostData.LatticeRPCPrefix, target))
+	return wrpcnats.NewClient(wp.natsConnection, wrpcnats.WithPrefix(fmt.Sprintf("%s.%s", wp.hostData.LatticeRPCPrefix, target)))
 }
 
 func (wp *WasmcloudProvider) Start() error {

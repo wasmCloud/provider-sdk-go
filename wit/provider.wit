@@ -1,0 +1,6 @@
+package wasmcloud:provider;
+
+world internal {
+  import wrpc:http/incoming-handler@0.1.0;
+}
+

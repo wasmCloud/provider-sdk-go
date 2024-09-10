@@ -1,0 +1,11 @@
+interface incoming-handler {
+    use types.{request, response, error-code};
+
+    handle: func(request: request) -> result<response, error-code>;
+}
+
+interface outgoing-handler {
+    use types.{request, response, error-code, request-options};
+
+    handle: func(request: request, options: option<request-options>) -> result<response, error-code>;
+}

@@ -1,8 +1,10 @@
-//go:generate wit-bindgen-wrpc go --out-dir bindings --package github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings wit
+//go:generate wit-bindgen-wrpc go -w server --out-dir bindings --package github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings wit
+//go:generate wit-bindgen-wrpc go -w testing --out-dir bindings/testing --package github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory/bindings/testing wit
 
 package main
 
 import (
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -14,19 +16,20 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Stdin); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func run(source io.Reader) error {
 	p := &Provider{
 		sourceLinks: make(map[string]provider.InterfaceLinkDefinition),
 		targetLinks: make(map[string]provider.InterfaceLinkDefinition),
 		tracer:      otel.Tracer("keyvalue-inmemory"),
 	}
 
-	wasmcloudprovider, err := provider.New(
+	wasmcloudprovider, err := provider.NewWithHostDataSource(
+		source,
 		provider.SourceLinkPut(p.handleNewSourceLink),
 		provider.TargetLinkPut(p.handleNewTargetLink),
 		provider.SourceLinkDel(p.handleDelSourceLink),

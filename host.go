@@ -1,9 +1,28 @@
 package provider
 
+import "encoding/json"
+
 const (
 	OtelProtocolHTTP = "Http"
 	OtelProtocolGRPC = "Grpc"
 )
+
+type RedactedString string
+
+func (rs RedactedString) String() string {
+	if rs != "" {
+		return "redacted(string)"
+	}
+	return ""
+}
+
+func (rs RedactedString) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rs.String())
+}
+
+func (rs RedactedString) Reveal() string {
+	return string(rs)
+}
 
 type OtelConfig struct {
 	EnableObservability   bool   `json:"enable_observability"`
@@ -32,7 +51,7 @@ type HostData struct {
 	Config                 map[string]string          `json:"config,omitempty"`
 	Secrets                map[string]SecretValue     `json:"secrets,omitempty"`
 	HostXKeyPublicKey      string                     `json:"host_xkey_public_key,omitempty"`
-	ProviderXKeyPrivateKey SecretStringValue          `json:"provider_xkey_private_key,omitempty"`
+	ProviderXKeyPrivateKey RedactedString             `json:"provider_xkey_private_key,omitempty"`
 	DefaultRPCTimeoutMS    *uint64                    `json:"default_rpc_timeout_ms,omitempty"`
 	StructuredLogging      bool                       `json:"structured_logging,omitempty"`
 	LogLevel               *Level                     `json:"log_level,omitempty"`

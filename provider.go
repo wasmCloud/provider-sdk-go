@@ -168,17 +168,17 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	var providerXkey nkeys.KeyPair
-	if len(hostData.ProviderXKeyPrivateKey.Reveal()) == 0 {
+	if hostData.ProviderXKeyPrivateKey != "" {
+		providerXkey, err = nkeys.FromCurveSeed([]byte(hostData.ProviderXKeyPrivateKey.Reveal()))
+		if err != nil {
+			logger.Error("failed to create provider xkey from private key", slog.Any("error", err))
+			return nil, err
+		}
+	} else {
 		// If the provider xkey is not provided, secrets won't be sent to the provider
 		// so we can just create a new xkey
 		providerXkey, err = nkeys.CreateCurveKeys()
 		if err != nil {
-			return nil, err
-		}
-	} else {
-		providerXkey, err = nkeys.FromCurveSeed([]byte(hostData.ProviderXKeyPrivateKey.Reveal()))
-		if err != nil {
-			logger.Error("failed to create provider xkey from private key", slog.Any("error", err))
 			return nil, err
 		}
 	}

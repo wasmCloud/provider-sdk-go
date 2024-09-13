@@ -13,7 +13,7 @@ func TestLatticeTopics(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected err to be nil, got: %v", err)
 	}
-	wasmCloudOneDotZero := HostData{ProviderKey: "providerfoo", LatticeRPCPrefix: "lattice123", ProviderXKeyPrivateKey: SecretStringValue{value: ""}, HostXKeyPublicKey: ""}
+	wasmCloudOneDotZero := HostData{ProviderKey: "providerfoo", LatticeRPCPrefix: "lattice123", ProviderXKeyPrivateKey: RedactedString(""), HostXKeyPublicKey: ""}
 	OneDotZeroTopics := LatticeTopics(wasmCloudOneDotZero, xkey)
 
 	// Test LATTICE_LINK_GET
@@ -55,7 +55,7 @@ func TestLatticeTopics(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected err to be nil, got: %v", err)
 	}
-	wasmCloudOneDotOne := HostData{ProviderKey: "providerfoo", LatticeRPCPrefix: "lattice123", ProviderXKeyPrivateKey: SecretStringValue{value: string(xkeyPrivateKey)}, HostXKeyPublicKey: xkeyPublicKey}
+	wasmCloudOneDotOne := HostData{ProviderKey: "providerfoo", LatticeRPCPrefix: "lattice123", ProviderXKeyPrivateKey: RedactedString(string(xkeyPrivateKey)), HostXKeyPublicKey: xkeyPublicKey}
 	OneDotOneTopics := LatticeTopics(wasmCloudOneDotOne, xkey)
 
 	// Test LATTICE_LINK_GET

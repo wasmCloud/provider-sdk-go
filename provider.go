@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -62,14 +63,18 @@ type WasmcloudProvider struct {
 }
 
 func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
-	reader := bufio.NewReader(os.Stdin)
+	return NewWithHostDataSource(os.Stdin, options...)
+}
+
+func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*WasmcloudProvider, error) {
+	reader := bufio.NewReader(source)
 
 	// Make a channel to receive the host data so we can timeout if we don't receive it
 	// All host data is sent immediately after the provider starts
 	hostDataChannel := make(chan string, 1)
 	go func() {
 		hostDataRaw, err := reader.ReadString('\n')
-		if err != nil {
+		if err != nil && err != io.EOF {
 			log.Fatal(err)
 		}
 		hostDataChannel <- hostDataRaw
@@ -168,17 +173,17 @@ func New(options ...ProviderHandler) (*WasmcloudProvider, error) {
 	}
 
 	var providerXkey nkeys.KeyPair
-	if len(hostData.ProviderXKeyPrivateKey.Reveal()) == 0 {
+	if hostData.ProviderXKeyPrivateKey != "" {
+		providerXkey, err = nkeys.FromCurveSeed([]byte(hostData.ProviderXKeyPrivateKey.Reveal()))
+		if err != nil {
+			logger.Error("failed to create provider xkey from private key", slog.Any("error", err))
+			return nil, err
+		}
+	} else {
 		// If the provider xkey is not provided, secrets won't be sent to the provider
 		// so we can just create a new xkey
 		providerXkey, err = nkeys.CreateCurveKeys()
 		if err != nil {
-			return nil, err
-		}
-	} else {
-		providerXkey, err = nkeys.FromCurveSeed([]byte(hostData.ProviderXKeyPrivateKey.Reveal()))
-		if err != nil {
-			logger.Error("failed to create provider xkey from private key", slog.Any("error", err))
 			return nil, err
 		}
 	}

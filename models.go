@@ -22,7 +22,7 @@ func LatticeTopics(h HostData, providerXkey nkeys.KeyPair) Topics {
 	// public key and the provider xkey private key.
 	var providerLinkPutKey string
 	publicKey, err := providerXkey.PublicKey()
-	if len(h.HostXKeyPublicKey) == 0 || len(h.ProviderXKeyPrivateKey.Reveal()) == 0 || err != nil {
+	if h.HostXKeyPublicKey == "" || h.ProviderXKeyPrivateKey == "" || err != nil {
 		providerLinkPutKey = h.ProviderKey
 	} else {
 		providerLinkPutKey = publicKey

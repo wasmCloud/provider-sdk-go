@@ -1,7 +1,7 @@
 package wrpchttp
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,23 +11,15 @@ import (
 	wasitypes "go.wasmcloud.dev/provider/internal/wasi/http/types"
 	"go.wasmcloud.dev/provider/internal/wrpc/http/incoming_handler"
 	wrpctypes "go.wasmcloud.dev/provider/internal/wrpc/http/types"
-	wrpc "wrpc.io/go"
-	wrpcnats "wrpc.io/go/nats"
-)
 
-type NatsClientCreator interface {
-	OutgoingRpcClient(target string) *wrpcnats.Client
-}
+	wrpc "wrpc.io/go"
+)
 
 type IncomingRoundTripper struct {
 	director    func(*http.Request) string
 	natsCreator NatsClientCreator
+	invoker     func(context.Context, wrpc.Invoker, *wrpctypes.Request) (*wrpc.Result[incoming_handler.Response, incoming_handler.ErrorCode], <-chan error, error)
 }
-
-var (
-	ErrNoTarget = errors.New("no target")
-	ErrRPC      = errors.New("rpc error")
-)
 
 var _ http.RoundTripper = (*IncomingRoundTripper)(nil)
 
@@ -48,6 +40,7 @@ func WithSingleTarget(target string) IncomingHandlerOption {
 func NewIncomingRoundTripper(nc NatsClientCreator, opts ...IncomingHandlerOption) *IncomingRoundTripper {
 	p := &IncomingRoundTripper{
 		natsCreator: nc,
+		invoker:     incoming_handler.Handle,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -77,7 +70,7 @@ func (p *IncomingRoundTripper) RoundTrip(r *http.Request) (*http.Response, error
 	}
 
 	wrpcClient := p.natsCreator.OutgoingRpcClient(target)
-	wresp, errCh, err := incoming_handler.Handle(r.Context(), wrpcClient, wreq)
+	wresp, errCh, err := p.invoker(r.Context(), wrpcClient, wreq)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +79,6 @@ func (p *IncomingRoundTripper) RoundTrip(r *http.Request) (*http.Response, error
 		return nil, fmt.Errorf("%w: %s", ErrRPC, wresp.Err)
 	}
 
-	trailers := make(http.Header)
 	respBody, trailers := WrpcBodyToHttp(wresp.Ok.Body, wresp.Ok.Trailers)
 
 	resp := &http.Response{

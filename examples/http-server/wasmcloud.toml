@@ -1,0 +1,8 @@
+name = "HTTP Server"
+language = "go"
+type = "provider"
+version = "0.1.0"
+
+[provider]
+bin_name = "http-server"
+vendor = "wasmCloud"

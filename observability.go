@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -22,9 +23,13 @@ import (
 )
 
 const (
-	OtelMetricExportInterval = 1 * time.Minute
-	OtelTraceExportInterval  = 1 * time.Minute
-	OtelLogExportInterval    = 10 * time.Second
+	OtelMetricExportInterval       = 1 * time.Minute
+	OtelTraceExportInterval        = 1 * time.Minute
+	OtelLogExportInterval          = 10 * time.Second
+	OtelProtocolHTTP               = "http"
+	OtelProtocolGRPC               = "grpc"
+	OtelSpanLimitAttributePerEvent = 16
+	OtelSpanLimitEventCount        = 64
 )
 
 func newPropagator() propagation.TextMapPropagator {
@@ -43,21 +48,22 @@ func newTracerProvider(ctx context.Context, config OtelConfig, serviceResource *
 		endpoint = config.ObservabilityEndpoint
 	}
 
-	switch config.Protocol {
+	switch strings.ToLower(config.Protocol) {
 	case OtelProtocolGRPC:
 		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithEndpointURL(endpoint))
 	case OtelProtocolHTTP:
 		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
 	default:
-		return nil, fmt.Errorf("unknown observability protocol '%s'", config.Protocol)
+		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	spanLimits := trace.SpanLimits{
-		AttributePerEventCountLimit: 16,
-		EventCountLimit:             64,
+		AttributePerEventCountLimit: OtelSpanLimitAttributePerEvent,
+		EventCountLimit:             OtelSpanLimitEventCount,
 	}
 
 	traceProvider := trace.NewTracerProvider(
@@ -81,14 +87,15 @@ func newMeterProvider(ctx context.Context, config OtelConfig, serviceResource *r
 		endpoint = config.ObservabilityEndpoint
 	}
 
-	switch config.Protocol {
+	switch strings.ToLower(config.Protocol) {
 	case OtelProtocolGRPC:
 		exporter, err = otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(endpoint))
 	case OtelProtocolHTTP:
 		exporter, err = otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(endpoint))
 	default:
-		return nil, fmt.Errorf("unknown observability protocol '%s'", config.Protocol)
+		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -111,14 +118,15 @@ func newLoggerProvider(ctx context.Context, config OtelConfig, serviceResource *
 		endpoint = config.ObservabilityEndpoint
 	}
 
-	switch config.Protocol {
+	switch strings.ToLower(config.Protocol) {
 	case OtelProtocolGRPC:
 		exporter, err = otlploggrpc.New(ctx, otlploggrpc.WithEndpointURL(endpoint))
 	case OtelProtocolHTTP:
 		exporter, err = otlploghttp.New(ctx, otlploghttp.WithEndpointURL(endpoint))
 	default:
-		return nil, fmt.Errorf("unknown observability protocol '%s'", config.Protocol)
+		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -137,12 +145,11 @@ func newServiceResource(ctx context.Context, name string) (*resource.Resource, e
 	if err != nil {
 		return nil, err
 	}
-	serviceName := semconv.ServiceNameKey.String(filepath.Base(providerBinary))
-	providerName := semconv.ServiceInstanceIDKey.String(name)
+
 	return resource.New(ctx,
 		resource.WithAttributes(
-			serviceName,
-			providerName,
+			semconv.ServiceNameKey.String(filepath.Base(providerBinary)),
+			semconv.ServiceInstanceIDKey.String(name),
 		),
 	)
 }

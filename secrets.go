@@ -72,7 +72,7 @@ func (s *SecretStringValue) UnmarshalJSON(data []byte) error {
 func DecryptSecrets(encryptedBytes *[]byte, xkey nkeys.KeyPair, sender string) (map[string]SecretValue, error) {
 	var sourceSecrets = make(map[string]SecretValue)
 	// If the source secrets are empty or not present, we don't need to decrypt/unmarshal them
-	if encryptedBytes != nil && len(*encryptedBytes) >= 0 {
+	if encryptedBytes != nil && len(*encryptedBytes) != 0 {
 		sourceSecretBytes, err := xkey.Open(*encryptedBytes, sender)
 		if err != nil {
 			return sourceSecrets, err

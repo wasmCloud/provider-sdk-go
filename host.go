@@ -2,11 +2,6 @@ package provider
 
 import "encoding/json"
 
-const (
-	OtelProtocolHTTP = "Http"
-	OtelProtocolGRPC = "Grpc"
-)
-
 type RedactedString string
 
 func (rs RedactedString) String() string {

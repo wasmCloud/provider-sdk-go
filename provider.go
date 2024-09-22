@@ -22,6 +22,10 @@ import (
 	wrpcnats "wrpc.io/go/nats"
 )
 
+const (
+	hostDataReadTimeout = 5 * time.Second
+)
+
 type WasmcloudProvider struct {
 	Id string
 
@@ -92,7 +96,7 @@ func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*Wasmc
 		if err != nil {
 			return nil, err
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(hostDataReadTimeout):
 		log.Fatal("failed to read host data, did not receive after 5 seconds")
 	}
 
@@ -567,7 +571,6 @@ func (wp *WasmcloudProvider) isLinked(sourceId string, target string) bool {
 	} else if target == wp.Id {
 		_, exists := wp.targetLinks[sourceId]
 		return exists
-	} else {
-		return false
 	}
+	return false
 }

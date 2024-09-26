@@ -21,14 +21,13 @@ func (rs RedactedString) Reveal() string {
 
 type OtelConfig struct {
 	EnableObservability   bool   `json:"enable_observability"`
-	EnableTraces          *bool  `json:"enable_traces,omitempty"`
-	EnableMetrics         *bool  `json:"enable_metrics,omitempty"`
-	EnableLogs            *bool  `json:"enable_logs,omitempty"`
+	EnableTraces          bool   `json:"enable_traces,omitempty"`
+	EnableMetrics         bool   `json:"enable_metrics,omitempty"`
+	EnableLogs            bool   `json:"enable_logs,omitempty"`
 	ObservabilityEndpoint string `json:"observability_endpoint,omitempty"`
 	TracesEndpoint        string `json:"traces_endpoint,omitempty"`
 	MetricsEndpoint       string `json:"metrics_endpoint,omitempty"`
 	LogsEndpoint          string `json:"logs_endpoint,omitempty"`
-	TraceLevel            *Level `json:"trace_level,omitempty"`
 	Protocol              string `json:"protocol,omitempty"`
 }
 

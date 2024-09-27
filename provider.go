@@ -125,7 +125,7 @@ func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*Wasmc
 		return nil, err
 	}
 
-	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableMetrics != nil && *hostData.OtelConfig.EnableMetrics) {
+	if hostData.OtelConfig.EnableObservability || hostData.OtelConfig.EnableMetrics {
 		meterProvider, err := newMeterProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err
@@ -134,7 +134,7 @@ func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*Wasmc
 		internalShutdownFuncs = append(internalShutdownFuncs, func(c context.Context) error { return meterProvider.Shutdown(c) })
 	}
 
-	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableTraces != nil && *hostData.OtelConfig.EnableTraces) {
+	if hostData.OtelConfig.EnableObservability || hostData.OtelConfig.EnableTraces {
 		tracerProvider, err := newTracerProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err
@@ -143,7 +143,7 @@ func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*Wasmc
 		internalShutdownFuncs = append(internalShutdownFuncs, func(c context.Context) error { return tracerProvider.Shutdown(c) })
 	}
 
-	if hostData.OtelConfig.EnableObservability || (hostData.OtelConfig.EnableLogs != nil && *hostData.OtelConfig.EnableLogs) {
+	if hostData.OtelConfig.EnableObservability || hostData.OtelConfig.EnableLogs {
 		loggerProvider, err := newLoggerProvider(context.Background(), hostData.OtelConfig, serviceResource)
 		if err != nil {
 			return nil, err

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -43,16 +42,11 @@ func newTracerProvider(ctx context.Context, config OtelConfig, serviceResource *
 	var exporter trace.SpanExporter
 	var err error
 
-	endpoint := config.TracesEndpoint
-	if endpoint == "" {
-		endpoint = config.ObservabilityEndpoint
-	}
-
-	switch strings.ToLower(config.Protocol) {
+	switch config.OtelProtocol() {
 	case OtelProtocolGRPC:
-		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithEndpointURL(endpoint))
+		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithEndpointURL(config.TracesURL()))
 	case OtelProtocolHTTP:
-		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
+		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(config.TracesURL()))
 	default:
 		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}
@@ -82,16 +76,11 @@ func newMeterProvider(ctx context.Context, config OtelConfig, serviceResource *r
 	var exporter metric.Exporter
 	var err error
 
-	endpoint := config.MetricsEndpoint
-	if endpoint == "" {
-		endpoint = config.ObservabilityEndpoint
-	}
-
-	switch strings.ToLower(config.Protocol) {
+	switch config.OtelProtocol() {
 	case OtelProtocolGRPC:
-		exporter, err = otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(endpoint))
+		exporter, err = otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(config.MetricsURL()))
 	case OtelProtocolHTTP:
-		exporter, err = otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(endpoint))
+		exporter, err = otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(config.MetricsURL()))
 	default:
 		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}
@@ -113,16 +102,11 @@ func newLoggerProvider(ctx context.Context, config OtelConfig, serviceResource *
 	var exporter log.Exporter
 	var err error
 
-	endpoint := config.LogsEndpoint
-	if endpoint == "" {
-		endpoint = config.ObservabilityEndpoint
-	}
-
-	switch strings.ToLower(config.Protocol) {
+	switch config.OtelProtocol() {
 	case OtelProtocolGRPC:
-		exporter, err = otlploggrpc.New(ctx, otlploggrpc.WithEndpointURL(endpoint))
+		exporter, err = otlploggrpc.New(ctx, otlploggrpc.WithEndpointURL(config.LogsURL()))
 	case OtelProtocolHTTP:
-		exporter, err = otlploghttp.New(ctx, otlploghttp.WithEndpointURL(endpoint))
+		exporter, err = otlploghttp.New(ctx, otlploghttp.WithEndpointURL(config.LogsURL()))
 	default:
 		return nil, fmt.Errorf("unknown observability protocol %q", config.Protocol)
 	}

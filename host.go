@@ -1,6 +1,10 @@
 package provider
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 type RedactedString string
 
@@ -29,6 +33,118 @@ type OtelConfig struct {
 	MetricsEndpoint       string `json:"metrics_endpoint,omitempty"`
 	LogsEndpoint          string `json:"logs_endpoint,omitempty"`
 	Protocol              string `json:"protocol,omitempty"`
+}
+
+type otelSignal int
+
+const (
+	traces otelSignal = iota
+	metrics
+	logs
+
+	// https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/#otel_exporter_otlp_endpoint
+	OtelExporterGrpcEndpoint = "http://localhost:4317"
+	OtelExporterHttpEndpoint = "http://localhost:4318"
+
+	// https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/#otel_exporter_otlp_traces_endpoint
+	OtelExporterHttpTracesPath = "/v1/traces"
+	// https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/#otel_exporter_otlp_metrics_endpoint
+	OtelExporterHttpMetricsPath = "/v1/metrics"
+	// https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/#otel_exporter_otlp_logs_endpoint
+	OtelExporterHttpLogsPath = "/v1/logs"
+)
+
+// OtelProtocol returns the configured OpenTelemetry protocol if one is provided,
+// otherwise defaulting to http.
+func (config *OtelConfig) OtelProtocol() string {
+	protocol := OtelProtocolHTTP
+	if config.Protocol != "" {
+		protocol = strings.ToLower(config.Protocol)
+	}
+	return protocol
+}
+
+// TracesURL returns the configured TracesEndpoint as-is if one is provided,
+// otherwise it resolves the URL based on ObservabilityEndpoint value and the
+// Protocol appropriate path.
+func (config *OtelConfig) TracesURL() string {
+	if config.TracesEndpoint != "" {
+		return config.TracesEndpoint
+	}
+
+	return config.resolveSignalUrl(traces)
+}
+
+// MetricsURL returns the configured MetricsEndpoint as-is if one is provided,
+// otherwise it resolves the URL based on ObservabilityEndpoint value and the
+// Protocol appropriate path.
+func (config *OtelConfig) MetricsURL() string {
+	if config.MetricsEndpoint != "" {
+		return config.MetricsEndpoint
+	}
+
+	return config.resolveSignalUrl(metrics)
+}
+
+// LogsURL returns the configured LogsEndpoint as-is if one is provided,
+// otherwise it resolves the URL based on ObservabilityEndpoint value and the
+// Protocol appropriate path.
+func (config *OtelConfig) LogsURL() string {
+	if config.LogsEndpoint != "" {
+		return config.LogsEndpoint
+	}
+
+	return config.resolveSignalUrl(logs)
+}
+
+// TracesEnabled returns whether emitting traces has been enabled.
+func (config *OtelConfig) TracesEnabled() bool {
+	return config.EnableObservability || config.EnableTraces
+}
+
+// MetricsEnabled returns whether emitting metrics has been enabled.
+func (config *OtelConfig) MetricsEnabled() bool {
+	return config.EnableObservability || config.EnableMetrics
+}
+
+// LogsEnabled returns whether emitting logs has been enabled.
+func (config *OtelConfig) LogsEnabled() bool {
+	return config.EnableObservability || config.EnableLogs
+}
+
+func (config *OtelConfig) resolveSignalUrl(signal otelSignal) string {
+	endpoint := config.defaultEndpoint()
+	if config.ObservabilityEndpoint != "" {
+		endpoint = config.ObservabilityEndpoint
+	}
+	endpoint = strings.TrimRight(endpoint, "/")
+
+	return fmt.Sprintf("%s%s", endpoint, config.defaultSignalPath(signal))
+}
+
+func (config *OtelConfig) defaultEndpoint() string {
+	endpoint := OtelExporterHttpEndpoint
+	if config.OtelProtocol() == OtelProtocolGRPC {
+		endpoint = OtelExporterGrpcEndpoint
+	}
+	return endpoint
+}
+
+func (config *OtelConfig) defaultSignalPath(signal otelSignal) string {
+	// In case of gRPC, we return empty string gRPC doesn't need a path to be set for it.
+	if config.OtelProtocol() == OtelProtocolGRPC {
+		return ""
+	}
+
+	switch signal {
+	case traces:
+		return OtelExporterHttpTracesPath
+	case metrics:
+		return OtelExporterHttpMetricsPath
+	case logs:
+		return OtelExporterHttpLogsPath
+	}
+	return ""
 }
 
 type HostData struct {

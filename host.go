@@ -57,11 +57,11 @@ const (
 // OtelProtocol returns the configured OpenTelemetry protocol if one is provided,
 // otherwise defaulting to http.
 func (config *OtelConfig) OtelProtocol() string {
-	protocol := OtelProtocolHTTP
 	if config.Protocol != "" {
-		protocol = strings.ToLower(config.Protocol)
+		return strings.ToLower(config.Protocol)
 	}
-	return protocol
+
+	return OtelProtocolHTTP
 }
 
 // TracesURL returns the configured TracesEndpoint as-is if one is provided,
@@ -123,11 +123,11 @@ func (config *OtelConfig) resolveSignalUrl(signal otelSignal) string {
 }
 
 func (config *OtelConfig) defaultEndpoint() string {
-	endpoint := OtelExporterHttpEndpoint
 	if config.OtelProtocol() == OtelProtocolGRPC {
-		endpoint = OtelExporterGrpcEndpoint
+		return OtelExporterGrpcEndpoint
 	}
-	return endpoint
+
+	return OtelExporterHttpEndpoint
 }
 
 func (config *OtelConfig) defaultSignalPath(signal otelSignal) string {

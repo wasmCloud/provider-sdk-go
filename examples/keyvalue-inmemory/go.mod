@@ -2,9 +2,12 @@ module github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory
 
 go 1.22.3
 
-// NOTE: This is temporary until https://github.com/testcontainers/testcontainers-go/pull/2738
-// makes it into an actual release (v0.33.0+)
-replace github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.33.1-0.20240912084704-b60497e9c792
+replace (
+	// NOTE: This is temporary until https://github.com/testcontainers/testcontainers-go/pull/2738
+	// makes it into an actual release (v0.33.0+)
+	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.33.1-0.20240912084704-b60497e9c792
+	go.wasmcloud.dev/provider => ../..
+)
 
 require (
 	github.com/nats-io/nats.go v1.37.0
@@ -83,5 +86,3 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace go.wasmcloud.dev/provider => ../..

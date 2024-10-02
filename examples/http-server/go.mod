@@ -2,6 +2,8 @@ module github.com/wasmCloud/provider-sdk-go/examples/http-server
 
 go 1.22.3
 
+replace go.wasmcloud.dev/provider => ../..
+
 require (
 	go.wasmcloud.dev/provider v0.0.0-20240124183610-1a92f8d04935
 	wrpc.io/go v0.1.0
@@ -41,5 +43,3 @@ require (
 	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
-
-replace go.wasmcloud.dev/provider => ../..

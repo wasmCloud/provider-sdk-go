@@ -4,7 +4,7 @@ go 1.22.3
 
 require (
 	go.wasmcloud.dev/provider v0.0.0-20240124183610-1a92f8d04935
-	wrpc.io/go v0.0.3
+	wrpc.io/go v0.1.0
 )
 
 require (

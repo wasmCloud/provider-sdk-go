@@ -98,6 +98,10 @@ func (f fakeReceiver) Receive() ([]*wrpc.Tuple2[string, [][]uint8], error) {
 	return HttpHeaderToWrpc(f.headers), nil
 }
 
+func (fakeReceiver) Close() error {
+	return nil
+}
+
 func TestRoundtrip(t *testing.T) {
 	reqBody := "hello request"
 	respBody := "hello response"
@@ -159,7 +163,7 @@ func TestRoundtrip(t *testing.T) {
 		resp := wrpctypes.Response{
 			Status:   http.StatusOK,
 			Headers:  HttpHeaderToWrpc(http.Header{"X-Custom": []string{"x-value"}}),
-			Body:     bytes.NewReader([]byte(respBody)),
+			Body:     io.NopCloser(bytes.NewReader([]byte(respBody))),
 			Trailers: fakeReceiver{headers: http.Header{}},
 		}
 

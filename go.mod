@@ -18,7 +18,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0
 	go.opentelemetry.io/otel/sdk/log v0.4.0
 	go.opentelemetry.io/otel/sdk/metric v1.28.0
-	wrpc.io/go v0.0.3
+	wrpc.io/go v0.1.0
 )
 
 require (

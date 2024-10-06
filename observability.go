@@ -134,8 +134,8 @@ func newServiceResource(ctx context.Context, hostData HostData) (*resource.Resou
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(hostData.ProviderKey),
 			semconv.HostIDKey.String(hostData.HostID),
-			semconv.ContainerIDKey.String(hostData.InstanceID),
-			semconv.ContainerImageNameKey.String(filepath.Base(providerBinary)),
+			semconv.ServiceInstanceIDKey.String(hostData.InstanceID),
+			semconv.ProcessExecutableNameKey.String(filepath.Base(providerBinary)),
 		),
 	)
 }

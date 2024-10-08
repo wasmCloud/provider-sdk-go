@@ -124,7 +124,7 @@ func newLoggerProvider(ctx context.Context, config OtelConfig, serviceResource *
 	return loggerProvider, nil
 }
 
-func newServiceResource(ctx context.Context, name string) (*resource.Resource, error) {
+func newServiceResource(ctx context.Context, hostData HostData) (*resource.Resource, error) {
 	providerBinary, err := os.Executable()
 	if err != nil {
 		return nil, err
@@ -132,8 +132,10 @@ func newServiceResource(ctx context.Context, name string) (*resource.Resource, e
 
 	return resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String(filepath.Base(providerBinary)),
-			semconv.ServiceInstanceIDKey.String(name),
+			semconv.ServiceNameKey.String(hostData.ProviderKey),
+			semconv.HostIDKey.String(hostData.HostID),
+			semconv.ServiceInstanceIDKey.String(hostData.InstanceID),
+			semconv.ProcessExecutableNameKey.String(filepath.Base(providerBinary)),
 		),
 	)
 }

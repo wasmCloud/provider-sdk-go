@@ -120,7 +120,7 @@ func NewWithHostDataSource(source io.Reader, options ...ProviderHandler) (*Wasmc
 	propagator := newPropagator()
 	otel.SetTextMapPropagator(propagator)
 
-	serviceResource, err := newServiceResource(context.Background(), hostData.ProviderKey)
+	serviceResource, err := newServiceResource(context.Background(), hostData)
 	if err != nil {
 		return nil, err
 	}

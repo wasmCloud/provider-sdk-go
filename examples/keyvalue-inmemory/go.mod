@@ -2,16 +2,11 @@ module github.com/wasmCloud/provider-sdk-go/examples/keyvalue-inmemory
 
 go 1.22.3
 
-replace (
-	// NOTE: This is temporary until https://github.com/testcontainers/testcontainers-go/pull/2738
-	// makes it into an actual release (v0.33.0+)
-	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.33.1-0.20240912084704-b60497e9c792
-	go.wasmcloud.dev/provider => ../..
-)
+replace go.wasmcloud.dev/provider => ../..
 
 require (
 	github.com/nats-io/nats.go v1.37.0
-	github.com/testcontainers/testcontainers-go v0.33.0
+	github.com/testcontainers/testcontainers-go v0.34.0
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/trace v1.28.0
 	go.wasmcloud.dev/provider v0.0.0-20240124183610-1a92f8d04935
@@ -26,7 +21,7 @@ require (
 	github.com/containerd/containerd v1.7.18 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/cpuguy83/dockercfg v0.3.1 // indirect
+	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v27.1.1+incompatible // indirect

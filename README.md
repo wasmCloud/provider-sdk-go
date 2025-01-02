@@ -1,5 +1,8 @@
 # wasmCloud Provider SDK
 
+> [!IMPORTANT]
+> We have consolidated all of the wasmCloud Go SDKs and tooling under [github.com/wasmCloud/go](https://github.com/wasmCloud/go) where the future work and improvements will be done.
+
 Providers are swappable [wasmCloud](https://wasmcloud.com) host plugins. They are executables (usually dedicated to longer-lived processes) that deliver common functionalities called capabilities. Providers are typically responsible for [capabilities](https://wasmcloud.com/docs/concepts/capabilities) that are not considered part of the core business logic of an application, such as...
 
 - Sending notifications

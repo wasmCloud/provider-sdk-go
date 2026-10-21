@@ -1,3 +1,7 @@
+> [!WARNING]
+> This repository is archived and is no longer maintained. It receives no bug fixes or security updates.
+> Go SDKs and tooling are maintained in [wasmCloud/go](https://github.com/wasmCloud/go). wasmCloud 1.x is fully deprecated.
+
 # wasmCloud Provider SDK
 
 > [!IMPORTANT]
